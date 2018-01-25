@@ -3,6 +3,77 @@
 ## Definitions of custom functions created for 'narc-dfmerge.R'
 
 
+
+
+
+
+## Loads the packages needed to work with the project, and where any is
+## missing, downloads it from CRAN and installs for loading.
+load_packages <- function(pkgs) {
+    isLoaded <-
+        suppressPackageStartupMessages(sapply(
+            pkgs,
+            require,
+            character.only = TRUE,
+            quietly = TRUE
+        ))
+    missingPkgs <- pkgs[!isLoaded]
+    if (length(missingPkgs)) {
+        install.packages(as.character(missingPkgs),
+                         repos = "https://cran.rstudio.com")
+        suppressPackageStartupMessages(lapply(
+            missingPkgs, library, character.only = TRUE))
+    }
+    
+    if (any(!pkgs %in% (.packages())))
+        stop("Required packages are not installed or loaded.")
+}
+
+
+
+
+
+
+
+
+## Finds all existing Excel files within
+
+find_excel_files <- function(path = ".") {
+    xlFiles <- list.files(path, pattern = ".xlsx$|.xls$")
+    numFiles <- length(xlFiles)
+    if (!numFiles) {
+        stop("There are no Excel files in this directory.")
+    } else {
+        cat(sprintf(
+            ngettext(
+                numFiles,
+                "\t%d Excel file was found:\n",
+                "\t%d Excel files were found:\n"
+            ),
+            numFiles
+        ))
+        
+        ## Check for file fragments
+        xlFiles <- xlFiles[!grepl("^~", xlFiles)]
+
+        ## List the files
+        invisible(sapply(xlFiles, function(x) {
+            cat(sprintf("\t  * %s\n", x))
+        }))
+    }
+    
+    invisible(xlFiles)
+}
+
+
+
+
+
+
+
+
+
+
 ## Finds the row that likely contains the actual header and
 ## returns an S3 object that is a marker to the row it occupies
 locate_header <- function(df, hdr, quietly = TRUE) {
@@ -41,6 +112,14 @@ locate_header <- function(df, hdr, quietly = TRUE) {
     invisible(val)
 }
 
+
+
+
+
+
+
+
+
 ## Updates old column names of the data frame with the new
 ## ones that are to be used in the harmonised version
 update_header <- function(df, newCol) {
@@ -67,7 +146,7 @@ update_header <- function(df, newCol) {
             x <- newCol[4]
         else if (identical(tolower(x), newCol[5]))
             x <- newCol[5]
-        else if (regexpr("day", tolower(x)) > 0) # review this step?
+        else if (grepl("day", tolower(x))) # review this step?
             x <- newCol[6]
         else if (identical(tolower(x), "wed ann"))
             x <- newCol[7]
@@ -83,6 +162,12 @@ update_header <- function(df, newCol) {
     colnames(df) <- modifiedHdr
     invisible(df)
 }
+
+
+
+
+
+
 
 
 ## Rearranges the columns of data frames to suit the prescribed
@@ -114,6 +199,12 @@ rearrange_df <- function(df, hdr) {
     newDf
 }
 
+
+
+
+
+
+
 ## Combines all the data frames in the list into one master data frame
 combine_dfs <- function(dfs) {
     final <- dfs[[1]]
@@ -124,25 +215,51 @@ combine_dfs <- function(dfs) {
     final
 }
 
-## Setting the columns to the appropriate data types
+
+
+
+
+
+
+
+
+## Sets the columns to the appropriate data types
 set_datatypes <- function(df) {
-    cat("(NB: Yet to fix date columns!!!) ")
-    df$serialno <- as.integer(df$serialno)
+    df$serialno <- seq_along(df$serialno)
     df$phone <- fix_phone_numbers(df$phone)
+    
+    ## TODO: Undo hard coding
     for (i in c(2, 4:5))
         df[[i]] <- as.character(df[[i]])
     for (i in c(8:11))
         df[[i]] <- as.factor(df[[i]])
     
+    warning("Yet to fix date columns.")
     invisible(df)
 }
 
-## Fixing up phone number to a uniform text format
+
+
+
+
+
+
+
+
+## Fixes up phone numbers to a uniform text format
 fix_phone_numbers <- function(column) {
     invisible(column <- column %>%
                   as.character() %>%
                   gsub("^([1-9])", "0\\1", .))
 }
+
+
+
+
+
+
+
+
 
     
 notice <- function() {

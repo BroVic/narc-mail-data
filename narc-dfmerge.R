@@ -2,36 +2,16 @@
 
 ## Copyright (c) 2018 Dev Solutions
 
-library(readxl)
-suppressPackageStartupMessages(library(lubridate))
-suppressPackageStartupMessages(library(dplyr))
-library(RSQLite)
-
 source("helpers.R")
-
 notice()
 
+## Ensure the availability and attachment of needed R extensions
+cat("Loading required packages... ")
+load_packages(pkgs = c("DBI", "RSQLite", "dplyr", "lubridate", "readxl"))
+cat("Done\n")
+
 cat("Checking for Excel files in the directory..,\n")
-excelfiles <- list.files(pattern = ".xlsx$|.xls$")
-numFiles <- length(excelfiles)
-if (!numFiles) {
-    cat("Not Found")
-    stop("There are no Excel files in this directory")
-} else {
-    cat(sprintf(
-        ngettext(
-            numFiles,
-            "\t%d Excel file was found:\n",
-            "\t%d Excel files were found:\n"
-        ),
-        numFiles
-    ))
-    
-    ## List the files
-    invisible(sapply(excelfiles, function(x) {
-        cat(sprintf("\t  * %s\n", x))
-    }))
-}
+excelFiles <- find_excel_files()
 
 cat("Creating a header for the new data frame... ")
 columnNames <- c(
@@ -47,10 +27,17 @@ columnNames <- c(
     "pastor",
     "info.source"
 )
+## Alternatively, replace birthday and anniversary with two additional columns
+## each as follows:
+## "bday.day", "bday.month", "anniv.day", "anniv.month"
+## see helpers.R for the logic.
+
+## Otherwise totally fix at point of data collection by asking for 
+## D.O.B. and data of marriage
 cat("Done\n")
 
 cat("Importing the data from Excel into R... ")
-df.ls <- sapply(excelfiles, read_excel, na = "NA")
+df.ls <- sapply(excelFiles, read_excel, na = "NA")
 cat("Done\n")
 
 cat("Identifying and afixing original headers... ")
