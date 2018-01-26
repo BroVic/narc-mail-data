@@ -11,7 +11,7 @@ load_packages(pkgs = c("DBI", "RSQLite", "dplyr", "lubridate", "readxl"))
 cat("Done\n")
 
 cat("Checking for Excel files in the directory..,\n")
-excelFiles <- find_excel_files()
+filepaths <- find_excel_files()
 
 cat("Creating a header for the new data frame... ")
 columnNames <- c(
@@ -20,8 +20,10 @@ columnNames <- c(
     "phone",
     "address",
     "email",
-    "birthday",
-    "anniversary",
+    "bday.day",
+    "bday.mth",
+    "wedann.day",
+    "wedann.mth",
     "occupation",
     "church",
     "pastor",
@@ -33,11 +35,22 @@ columnNames <- c(
 ## see helpers.R for the logic.
 
 ## Otherwise totally fix at point of data collection by asking for 
-## D.O.B. and data of marriage
+## D.O.B. and date of marriage
 cat("Done\n")
 
 cat("Importing the data from Excel into R... ")
-df.ls <- sapply(excelFiles, read_excel, na = "NA")
+excelList <- lapply(filepaths, excelFile)
+
+df.ls <- extract(excelList[[1]])
+len <- length(excelList)
+if (len > 1) {
+    for (i in 2:len) {
+        tmp <- extract(excelList[[i]])
+        df.ls <- append(df.ls, tmp)
+    }
+    zeroes <- sapply(df.ls, nrow)
+    df.ls <- df.ls[which(zeroes != 0)]
+}
 cat("Done\n")
 
 cat("Identifying and afixing original headers... ")
@@ -77,7 +90,7 @@ cat("Done\n")
 
 cat("Writing to database... ")
 dbFile <- "NARC-mailing-list.db"
-dbTable <- "NARC_mail"
+dbTable <- "NARC_mail_ext"
 
 con <- dbConnect(SQLite(), file.path(folder, dbFile))
 if (!dbIsValid(con))

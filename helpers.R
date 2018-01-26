@@ -1,10 +1,92 @@
 # helpers.R
 
-## Definitions of custom functions created for 'narc-dfmerge.R'
+################################
+## S3 constructor and methods ##
+################################
+
+## Constructs S3 objects of class 'excelFile'
+excelFile <- function(file) {
+    ## Generate a list of the individual spreadsheets
+    sheetList <- list()
+    sheets <-  excel_sheets(file)
+    num <- length(sheets)
+    for (i in 1:num) {
+        sheetList[[i]] <- read_excel(file, sheet = i)
+        df <- sheetList[[i]]
+        class(sheetList[[i]]) <-
+            c(class(sheetList[[i]]), "spreadsheet")
+    }
+    
+    ## Use file properties and data to build an object
+    prop <- file.info(file)
+    exf <- structure(
+        list(
+            fileName = file,
+            fileSize = prop$size,
+            created = prop$ctime,
+            modified = prop$mtime,
+            noOfSheets = num,
+            sheets = sheets,
+            data = sheetList
+        ),
+        class = "excelFile"
+    )
+    invisible(exf)
+}
+
+
+
+## Provides output information on the object
+print.excelFile <- function(xlObj) {
+    cat("Filename: ",
+        xlObj$fileName,
+        "with ",
+        xlObj$noOfSheets,
+        " spreadsheets.\n")
+    cat("Data: \n")
+    print(xlObj$data)
+}
+
+
+## Provides a summary of the object
+summary.excelFile <- function(xlobj) {
+    cat(paste0(
+        "File: ",
+        sQuote(xlObj$fileName),
+        ". Size:",
+        xlObj$fileSize,
+        "B\n"
+    ))
+    cat("Spreadsheet(s):\n")
+    for (i in 1:xlObj$noOfSheets) {
+        cat(paste0(i, ". ", sQuote(xlObj$sheets), "\n"))
+    }
+}
+
+
+## Define generic and default method for extracting spreadsheets
+extract <- function(x)
+    UseMethod("extract")
+
+extract.excelFile <- function(x) {
+    dfs <- list()
+    
+    for (i in 1:length(x$data)) {
+        dfs[[i]] <- x$data[[i]]
+    }
+    
+    invisible(dfs)
+}
+
+extract.default <- function(x)
+    "Unknown class."
 
 
 
 
+####################################################################
+##  Definitions of custom functions created for 'narc-dfmerge.R'  ##
+####################################################################
 
 
 ## Loads the packages needed to work with the project, and where any is
@@ -21,8 +103,7 @@ load_packages <- function(pkgs) {
     if (length(missingPkgs)) {
         install.packages(as.character(missingPkgs),
                          repos = "https://cran.rstudio.com")
-        suppressPackageStartupMessages(lapply(
-            missingPkgs, library, character.only = TRUE))
+        suppressPackageStartupMessages(lapply(missingPkgs, library, character.only = TRUE))
     }
     
     if (any(!pkgs %in% (.packages())))
@@ -39,7 +120,12 @@ load_packages <- function(pkgs) {
 ## Finds all existing Excel files within
 
 find_excel_files <- function(path = ".") {
-    xlFiles <- list.files(path, pattern = ".xlsx$|.xls$")
+    # TODO: There are situations when a file's extension
+    # may not be specified and thus there may be need to
+    # test such files to know whether they are of the format.
+    xlFiles <- list.files(path, pattern = ".xlsx$|.xls$") %>%
+        subset(!grepl("^~", .))
+    
     numFiles <- length(xlFiles)
     if (!numFiles) {
         stop("There are no Excel files in this directory.")
@@ -53,13 +139,10 @@ find_excel_files <- function(path = ".") {
             numFiles
         ))
         
-        ## Check for file fragments
-        xlFiles <- xlFiles[!grepl("^~", xlFiles)]
-
         ## List the files
-        invisible(sapply(xlFiles, function(x) {
+        sapply(xlFiles, function(x) {
             cat(sprintf("\t  * %s\n", x))
-        }))
+        })
     }
     
     invisible(xlFiles)
@@ -87,7 +170,7 @@ locate_header <- function(df, hdr, quietly = TRUE) {
     for (i in 1:nrow(df)) {
         ## Check whether we hit something that looks like column names
         ## and when we do, stop looking.
-        if (any(hdr %in% tolower(df[i, ]))) {
+        if (any(hdr %in% tolower(df[i,]))) {
             if (!quietly) {
                 cat(
                     paste0(
@@ -95,17 +178,17 @@ locate_header <- function(df, hdr, quietly = TRUE) {
                         i,
                         ":\n\t"
                     ),
-                    sQuote(df[i, ]),
+                    sQuote(df[i,]),
                     "\n"
                 )
             }
-            hdr <- as.character(df[i,])
-            val <- structure(
-                list(header = hdr,
-                     rownum = i,
-                     nextrow = i + 1),
-                class = "header-locator"
-            )
+            hdr <- as.character(df[i, ])
+            val <- structure(list(
+                header = hdr,
+                rownum = i,
+                nextrow = i + 1
+            ),
+            class = "header-locator")
             break
         }
     }
@@ -130,10 +213,9 @@ update_header <- function(df, newCol) {
     
     initialHdr <- colnames(df)
     modifiedHdr <- sapply(initialHdr, function(x) {
-        
         ## These are the values we're picking from 'newCol':
-        ### [1] "serialno"     [2] "name"          [3] "phone" 
-        ### [4] "address"      [5] "email"         [6] "birthday" 
+        ### [1] "serialno"     [2] "name"          [3] "phone"
+        ### [4] "address"      [5] "email"         [6] "birthday"
         ### [7] "anniversary"  [8] "occupation"    [9] "church"
         ### [10] "pastor"      [11] "info.source"
         if (identical(x, "S/N"))
@@ -146,7 +228,8 @@ update_header <- function(df, newCol) {
             x <- newCol[4]
         else if (identical(tolower(x), newCol[5]))
             x <- newCol[5]
-        else if (grepl("day", tolower(x))) # review this step?
+        else if (grepl("day", tolower(x)))
+            # review this step?
             x <- newCol[6]
         else if (identical(tolower(x), "wed ann"))
             x <- newCol[7]
@@ -261,7 +344,7 @@ fix_phone_numbers <- function(column) {
 
 
 
-    
+
 notice <- function() {
     cat("Copyright (c) Dev Solutions 2018. All rights reserved.\n")
     cat("  NOTICE: This software is provided without any warranty.\n\n")
