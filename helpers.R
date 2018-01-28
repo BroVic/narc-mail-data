@@ -117,7 +117,7 @@ load_packages <- function(pkgs) {
 
 
 
-## Finds all existing Excel files within
+## Finds all existing Excel files within a given directory
 
 find_excel_files <- function(path = ".") {
     # TODO: There are situations when a file's extension
