@@ -6,12 +6,13 @@
 
 ## Constructs S3 objects of class 'excelFile'
 excelFile <- function(file) {
-    ## Generate a list of the individual spreadsheets
+    
+    ## Generate a list of individual spreadsheets
     sheetList <- list()
     sheets <-  excel_sheets(file)
     num <- length(sheets)
     for (i in 1:num) {
-        sheetList[[i]] <- read_excel(file, sheet = i)
+        sheetList[[i]] <- read_excel(file, sheet = i, col_types = "text")
         df <- sheetList[[i]]
         class(sheetList[[i]]) <-
             c(class(sheetList[[i]]), "spreadsheet")
@@ -38,11 +39,11 @@ excelFile <- function(file) {
 
 ## Provides output information on the object
 print.excelFile <- function(xlObj) {
-    cat("Filename: ",
-        xlObj$fileName,
-        "with ",
-        xlObj$noOfSheets,
-        " spreadsheets.\n")
+    cat(sprintf(
+        ngettext(xlObj$noOfSheets,
+                 "Filename: %s with %s spreadsheet.\n",
+                 "Filename: %s with %s spreadsheets.\n"),
+        xlObj$fileName, xlObj$noOfSheets))
     cat("Data: \n")
     print(xlObj$data)
 }
@@ -65,23 +66,42 @@ summary.excelFile <- function(xlobj) {
 
 
 ## Define generic and default method for extracting spreadsheets
-extract <- function(x)
-    UseMethod("extract")
+extract <- function(x) UseMethod("extract")
 
-extract.excelFile <- function(x) {
+extract.excelFile <- function(file) {
     dfs <- list()
     
-    for (i in 1:length(x$data)) {
-        dfs[[i]] <- x$data[[i]]
+    for (i in 1:length(file$data)) {
+        dfs[[i]] <- file$data[[i]]
     }
     
     invisible(dfs)
 }
 
-extract.default <- function(x)
-    "Unknown class."
+extract.default <- function(x) "Unknown class."
 
 
+
+#######################
+##  Base data types  ##
+#######################
+
+## The names of the columns of the new table
+columnNames <- c(
+    "serialno",
+    "name",
+    "phone",
+    "address",
+    "email",
+    "bday.day",
+    "bday.mth",
+    "wedann.day",
+    "wedann.mth",
+    "occupation",
+    "church",
+    "pastor",
+    "info.source"
+)
 
 
 ####################################################################
@@ -103,7 +123,8 @@ load_packages <- function(pkgs) {
     if (length(missingPkgs)) {
         install.packages(as.character(missingPkgs),
                          repos = "https://cran.rstudio.com")
-        suppressPackageStartupMessages(lapply(missingPkgs, library, character.only = TRUE))
+        suppressPackageStartupMessages(lapply(
+            missingPkgs, library, character.only = TRUE))
     }
     
     if (any(!pkgs %in% (.packages())))
@@ -214,10 +235,11 @@ update_header <- function(df, newCol) {
     initialHdr <- colnames(df)
     modifiedHdr <- sapply(initialHdr, function(x) {
         ## These are the values we're picking from 'newCol':
-        ### [1] "serialno"     [2] "name"          [3] "phone"
-        ### [4] "address"      [5] "email"         [6] "birthday"
-        ### [7] "anniversary"  [8] "occupation"    [9] "church"
-        ### [10] "pastor"      [11] "info.source"
+        ### [1]  "serialno"     [2]  "name"       [3]  "phone"
+        ### [4]  "address"      [5]  "email"      [6]  "bday.day"
+        ### [7]  "bday.mth"     [8]  "wedann.day"  [9]  "wedann.mth" 
+        ### [10] "occupation"   [11] "church"     [12] "pastor"
+        ### [13] "info.source"  
         if (identical(x, "S/N"))
             x <- newCol[1]
         else if (grepl("name", tolower(x)))
@@ -228,19 +250,16 @@ update_header <- function(df, newCol) {
             x <- newCol[4]
         else if (identical(tolower(x), newCol[5]))
             x <- newCol[5]
-        else if (grepl("day", tolower(x)))
-            # review this step?
-            x <- newCol[6]
-        else if (identical(tolower(x), "wed ann"))
-            x <- newCol[7]
         else if (grepl("Occupation", x))
-            x <- newCol[8]
-        else if (grepl("church", tolower(x)))
-            x <- newCol[9]
-        else if (grepl("pastor$", tolower(x)))
             x <- newCol[10]
-        else if (grepl("know", tolower(x)))
+        else if (grepl("church", tolower(x)))
             x <- newCol[11]
+        else if (grepl("pastor$", tolower(x)))
+            x <- newCol[12]
+        else if (grepl("know", tolower(x)))
+            x <- newCol[13]
+        
+        ## Note: [6] - [9] have been taken care of in an earlier step.
     })
     colnames(df) <- modifiedHdr
     invisible(df)
@@ -305,7 +324,6 @@ combine_dfs <- function(dfs) {
 
 
 
-
 ## Sets the columns to the appropriate data types
 set_datatypes <- function(df) {
     df$serialno <- seq_along(df$serialno)
@@ -314,10 +332,11 @@ set_datatypes <- function(df) {
     ## TODO: Undo hard coding
     for (i in c(2, 4:5))
         df[[i]] <- as.character(df[[i]])
-    for (i in c(8:11))
+    for (i in c(7, 9:11))
         df[[i]] <- as.factor(df[[i]])
+    for (i in c(6, 8)) 
+        df[[i]] <- as.numeric(df[[i]])
     
-    warning("Yet to fix date columns.")
     invisible(df)
 }
 
@@ -336,6 +355,218 @@ fix_phone_numbers <- function(column) {
                   gsub("^([1-9])", "0\\1", .))
 }
 
+
+
+
+
+
+
+
+
+
+fix_funny_date_entries <-
+    function(df,
+             focusCol = c("bday.day", "bday.mth", "wedann.day", "wedann.mth")) {
+        ## WARNING: This function is lengthy due to the extensive
+        ## string manipulation required to get the desired result.
+        
+        ## Identify funny column and if non-existent exit unchanged, that is
+        ## spreadsheets that do not have any of these columns are skipped
+        fields <- colnames(df)
+        awkward <- c("BDAY/WED ANN",
+                     "BIRTHDAY AND WEDDING ANN",
+                     "WED ANN",
+                     "BIRTHDAY")
+        if (!any(awkward %in% fields))
+            return(df)
+        
+        ## Make a temporary data frame based on the new columns
+        tmpDf <- "" %>%
+            matrix(nrow = nrow(df), ncol = length(focusCol)) %>%
+            as_tibble()
+        colnames(tmpDf) <- focusCol
+        
+        ## Using regular expressions, establish pattern for entries that have:
+        ## => 2 numbers separated by a forward slash e.g. 10/6
+        ## => 2 day-month combos separated by a fwd slash e.g. May 6/June 12
+        ## => a "DD Month" e.g. 15 Oct
+        ## => an Excel date numeral e.g. "43322" equiv. to 12 Aug 2018
+        regex_slash_with_two_nums <-
+            "([[:digit:]]{1,2})(\\/)([[:digit:]]{1,2})"
+        regex_slash_day_and_mth <-
+            "(^[[:alnum:]]+\\s*[[:alnum:]]+)\\s*(/)\\s*([[:alnum:]]+\\s*[[:alnum:]]+$)"
+        regex_single_regular <- "(^[0-9]{1,2})(\\s+)([a-zA-Z]{3,}$)"
+        regex_date_numeral <- "[0-9]{5}"
+        
+        ## Loop through the awkward columns in the data frame
+        awkColIndex <- na.exclude(match(awkward, fields))
+        for (topIndex in awkColIndex) {
+            ## Get column name; for data frames with more than 1 funny column
+            nameCurrCol <- colnames(df)[topIndex]
+            
+            ## Get rid of ordinal qualifiers, and then remove dots,
+            ## commas and hyphens from all entries, and trim whitespace
+            df[[topIndex]] <- sapply(df[[topIndex]], function(x) {
+                str_replace(x, "nd|rd|st|th", replacement = "") %>%
+                    str_replace("[,|.|-]", replacement = " ") %>%
+                    str_trim()
+            })
+            
+            ## Derive the indices of entries within our awkward column
+            ## that match the patterns, respectively
+            index_twoNum <- grep(regex_slash_with_two_nums, df[[topIndex]])
+            index_eitherMth <-
+                grep(regex_slash_day_and_mth, df[[topIndex]])
+            index_single <- grep(regex_single_regular, df[[topIndex]])
+            index_numeral <- grep(regex_date_numeral, df[[topIndex]])
+            
+            ## From here on, irregular entries are picked out from the offending
+            ## column and broken into bits. Numerals (for days) and words (for
+            ## months) are sent to the appropriate columns.
+            
+            ## Also note that we work on the Excel 'Date' numeric values
+            ## We have set aside a correction of 2:
+            ## - one for the origin, which Excel includes unlike the 
+            ##   POSIX standard that we are using in R, and
+            ## - the 1900 that EXcel erroneously identifies as a leap year.
+            
+            ## We start with conditional branches to be followed depending on
+            ## whether a columns starts with a 'B' or a 'W'.
+            ## Note that at the beginning we do not use a loop. This is
+            ## because we can conveniently vectorize without losing data.
+            if (grepl("^B[[:graph:]]+", nameCurrCol)) {
+                
+                tmpDf$bday.day[index_twoNum] <- df[[topIndex]][index_twoNum]
+                tmpDf$bday.day <- tmpDf$bday.day %>%
+                    str_replace(regex_slash_with_two_nums, "\\1") %>%
+                    str_trim()
+                
+                tmpDf$bday.mth[index_twoNum] <-
+                    df[[topIndex]][index_twoNum]
+                tmpDf$bday.mth <- sapply(tmpDf$bday.mth, function(x) {
+                    str_replace(x, regex_slash_with_two_nums, "\\3") %>%
+                        str_trim()
+                }) %>%
+                    as.numeric() %>%
+                    month.name[.]
+                
+                ## Now we loop...
+                for (a_single in index_single) {
+                    tmpDf$bday.day[a_single] <-
+                        df[[topIndex]][a_single] %>%
+                        str_replace(regex_single_regular, "\\1") %>%
+                        str_trim()
+                    
+                    tmpDf$bday.mth[a_single] <-
+                        df[[topIndex]][a_single] %>%
+                        str_replace(regex_single_regular, "\\3") %>%
+                        str_trim()
+                }
+                
+                ## Numerical date values
+                correction <- 2
+                for (dateIndex in index_numeral) {
+                    ## Reformat into a Date string with Day and Month
+                    dateNumToChar <- format(as.Date(
+                        as.numeric(df[[topIndex]][dateIndex]) - correction,
+                        origin = "1900-01-01"),
+                        "%d %B")
+                    
+                    tmpDf$bday.day[dateIndex] <- dateNumToChar %>%
+                        str_replace(regex_single_regular, "\\1") %>%
+                        str_trim()
+                    
+                    tmpDf$bday.mth[dateIndex] <- dateNumToChar %>%
+                        str_replace(regex_single_regular, "\\3") %>%
+                        str_trim()
+                }
+                
+            } else if (grepl("^W[[:graph:]]+", nameCurrCol)) {
+                
+                tmpDf$wedann.day[index_twoNum] <- df[[topIndex]][index_twoNum]
+                tmpDf$wedann.day <- tmpDf$wedann.day %>%
+                    str_replace(regex_slash_with_two_nums, "\\1") %>%
+                    str_trim()
+                
+                tmpDf$wedann.mth[index_twoNum] <-
+                    df[[topIndex]][index_twoNum]
+                tmpDf$wedann.mth <- sapply(tmpDf$wedann.mth, function(x) {
+                    str_replace(x, regex_slash_with_two_nums, "\\3") %>%
+                        str_trim()
+                }) %>%
+                    as.numeric() %>%
+                    month.name[.]
+                
+                ## Now we loop...
+                for (a_single in index_single) {
+                    tmpDf$wedann.day[a_single] <-
+                        df[[topIndex]][a_single] %>%
+                        str_replace(regex_single_regular, "\\1") %>%
+                        str_trim()
+                    
+                    tmpDf$wedann.mth[a_single] <-
+                        df[[topIndex]][a_single] %>%
+                        str_replace(regex_single_regular, "\\3") %>%
+                        str_trim()
+                }
+                
+                ## Numerical date values
+                correction <- 2
+                for (dateIndex in index_numeral) {
+                    ## Reformat into a Date string with Day and Month
+                    dateNumToChar <- format(as.Date(
+                        as.numeric(df[[topIndex]][dateIndex]) - correction,
+                        origin = "1900-01-01"),
+                        "%d %B")
+                    
+                    tmpDf$wedann.day[dateIndex] <- dateNumToChar %>%
+                        str_replace(regex_single_regular, "\\1") %>%
+                        str_trim()
+                    
+                    tmpDf$wedann.mth[dateIndex] <- dateNumToChar %>%
+                        str_replace(regex_single_regular, "\\3") %>%
+                        str_trim()
+                }
+                
+            }  # end of if-else-if block
+            
+            
+            ## Here there are two date entries per cell so we distribute
+            ## string fragments to the appropriate cell in 'tmpDf'
+            for (an_eitherMth in index_eitherMth) {
+                tmpDf$bday.day[an_eitherMth] <- 
+                    df[[topIndex]][an_eitherMth] %>%
+                    str_replace(regex_slash_day_and_mth, "\\1") %>%
+                    str_replace("[[:alpha:]]+", "") %>%
+                    str_trim()
+                
+                tmpDf$bday.mth[an_eitherMth] <- 
+                    df[[topIndex]][an_eitherMth] %>%
+                    str_replace(regex_slash_day_and_mth, "\\1") %>%
+                    str_replace("[[:digit:]]+", "") %>%
+                    str_trim()
+                # TODO: partial matching of month names??
+                
+                tmpDf$wedann.day[an_eitherMth] <-
+                    df[[topIndex]][an_eitherMth] %>%
+                    str_replace(regex_slash_day_and_mth, "\\3") %>%
+                    str_replace("[[:alpha:]]+", "") %>%
+                    str_trim()
+                
+                tmpDf$wedann.mth[an_eitherMth] <-
+                    df[[topIndex]][an_eitherMth] %>%
+                    str_replace(regex_slash_day_and_mth, "\\3") %>%
+                    str_replace("[[:digit:]]+", "") %>%
+                    str_trim()
+            }
+            
+        }  # end of outermost loop
+        
+        ## Phew... return the modified data frame
+        df <- df %>% bind_cols(tmpDf)
+        df <- df[, -awkColIndex]
+        invisible(df)
+    }
 
 
 

@@ -7,36 +7,16 @@ notice()
 
 ## Ensure the availability and attachment of needed R extensions
 cat("Loading required packages... ")
-load_packages(pkgs = c("DBI", "RSQLite", "dplyr", "lubridate", "readxl"))
+load_packages(pkgs = c("DBI",
+                       "RSQLite",
+                       "dplyr",
+                       "lubridate",
+                       "readxl",
+                       "stringr"))
 cat("Done\n")
 
 cat("Checking for Excel files in the directory..,\n")
 filepaths <- find_excel_files()
-
-cat("Creating a header for the new data frame... ")
-columnNames <- c(
-    "serialno",
-    "name",
-    "phone",
-    "address",
-    "email",
-    "bday.day",
-    "bday.mth",
-    "wedann.day",
-    "wedann.mth",
-    "occupation",
-    "church",
-    "pastor",
-    "info.source"
-)
-## Alternatively, replace birthday and anniversary with two additional columns
-## each as follows:
-## "bday.day", "bday.month", "anniv.day", "anniv.month"
-## see helpers.R for the logic.
-
-## Otherwise totally fix at point of data collection by asking for 
-## D.O.B. and date of marriage
-cat("Done\n")
 
 cat("Importing the data from Excel into R... ")
 excelList <- lapply(filepaths, excelFile)
@@ -48,8 +28,8 @@ if (len > 1) {
         tmp <- extract(excelList[[i]])
         df.ls <- append(df.ls, tmp)
     }
-    zeroes <- sapply(df.ls, nrow)
-    df.ls <- df.ls[which(zeroes != 0)]
+    df_row_num <- sapply(df.ls, nrow)
+    df.ls <- df.ls[which(df_row_num != 0)]
 }
 cat("Done\n")
 
@@ -64,6 +44,10 @@ df.ls <- lapply(df.ls, function(df) {
     colnames(df) <- val$header
     df
 })
+cat("Done\n")
+
+cat("Working on date-related columns... ")
+df.ls <- lapply(df.ls, fix_funny_date_entries, focusCol = columnNames)
 cat("Done\n")
 
 cat("Updating original headers... ")
@@ -90,7 +74,7 @@ cat("Done\n")
 
 cat("Writing to database... ")
 dbFile <- "NARC-mailing-list.db"
-dbTable <- "NARC_mail_ext"
+dbTable <- "NARC_mail_3"
 
 con <- dbConnect(SQLite(), file.path(folder, dbFile))
 if (!dbIsValid(con))
