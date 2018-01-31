@@ -7,34 +7,30 @@
 ## Constructs S3 objects of class 'excelFile'
 excelFile <- function(file) {
     
-    ## Generate a list of individual spreadsheets
-    sheetList <- list()
-    sheets <-  excel_sheets(file)
-    num <- length(sheets)
-    for (i in 1:num) {
-        sheetList[[i]] <- read_excel(file, sheet = i, col_types = "text")
-        df <- sheetList[[i]]
-        class(sheetList[[i]]) <-
-            c(class(sheetList[[i]]), "spreadsheet")
-    }
+    ## Get individual spreadsheets
+    sheetNames <-  readxl::excel_sheets(file)
+    
+    sheetList <- lapply(sheetNames, function(sht) {
+        read_excel(path = file, sheet = sht, col_types = "text")
+        })
     
     ## Use file properties and data to build an object
     prop <- file.info(file)
+    
     exf <- structure(
         list(
             fileName = file,
             fileSize = prop$size,
             created = prop$ctime,
             modified = prop$mtime,
-            noOfSheets = num,
-            sheets = sheets,
+            noOfSheets = length(sheetNames),
+            sheets = sheetNames,
             data = sheetList
         ),
         class = "excelFile"
     )
     invisible(exf)
 }
-
 
 
 ## Provides output information on the object
@@ -66,19 +62,12 @@ summary.excelFile <- function(xlobj) {
 
 
 ## Define generic and default method for extracting spreadsheets
-extract <- function(x) UseMethod("extract")
+extract_spreadsheets <- function(x) UseMethod("extract_spreadsheets")
 
-extract.excelFile <- function(file) {
-    dfs <- list()
-    
-    for (i in 1:length(file$data)) {
-        dfs[[i]] <- file$data[[i]]
-    }
-    
-    invisible(dfs)
-}
+extract_spreadsheets.excelFile <- function(fileObj)
+    lapply(fileObj$data, function(dat) dat)
 
-extract.default <- function(x) "Unknown class."
+extract_spreadsheets.default <- function(x) "Unknown class."
 
 
 
@@ -372,6 +361,9 @@ fix_funny_date_entries <-
         
         ## Identify funny column and if non-existent exit unchanged, that is
         ## spreadsheets that do not have any of these columns are skipped
+        if (length(focusCol) != 4)
+            stop("focusCol should be of length == 4")
+        
         fields <- colnames(df)
         awkward <- c("BDAY/WED ANN",
                      "BIRTHDAY AND WEDDING ANN",
@@ -397,6 +389,7 @@ fix_funny_date_entries <-
             "(^[[:alnum:]]+\\s*[[:alnum:]]+)\\s*(/)\\s*([[:alnum:]]+\\s*[[:alnum:]]+$)"
         regex_single_regular <- "(^[0-9]{1,2})(\\s+)([a-zA-Z]{3,}$)"
         regex_date_numeral <- "[0-9]{5}"
+        regex_triple_entry <- "([0-9]+\\s+[[:alnum:]]{2,})(\\s+[0-9]{2,})"
         
         ## Loop through the awkward columns in the data frame
         awkColIndex <- na.exclude(match(awkward, fields))
@@ -406,8 +399,11 @@ fix_funny_date_entries <-
             
             ## Get rid of ordinal qualifiers, and then remove dots,
             ## commas and hyphens from all entries, and trim whitespace
-            df[[topIndex]] <- sapply(df[[topIndex]], function(x) {
-                str_replace(x, "nd|rd|st|th", replacement = "") %>%
+            df[[topIndex]] <- sapply(df[[topIndex]], function(entry) {
+                entry %>%
+                    str_replace("(/|-)([[:alnum:]]+)(/|-)[[:digit:]]{2,}$",
+                            replacement = "\\1\\2") %>%
+                    str_replace("nd|rd|st|th", replacement = "") %>%
                     str_replace("[,|.|-]", replacement = " ") %>%
                     str_trim()
             })
@@ -419,6 +415,7 @@ fix_funny_date_entries <-
                 grep(regex_slash_day_and_mth, df[[topIndex]])
             index_single <- grep(regex_single_regular, df[[topIndex]])
             index_numeral <- grep(regex_date_numeral, df[[topIndex]])
+            index_triples <- grep(regex_triple_entry, df[[topIndex]])
             
             ## From here on, irregular entries are picked out from the offending
             ## column and broken into bits. Numerals (for days) and words (for
@@ -462,6 +459,7 @@ fix_funny_date_entries <-
                         str_replace(regex_single_regular, "\\3") %>%
                         str_trim()
                 }
+                
                 
                 ## Numerical date values
                 correction <- 2
@@ -528,7 +526,7 @@ fix_funny_date_entries <-
                         str_trim()
                 }
                 
-            }  # end of if-else-if block
+            }  # end of if-else block
             
             
             ## Here there are two date entries per cell so we distribute

@@ -15,17 +15,17 @@ load_packages(pkgs = c("DBI",
                        "stringr"))
 cat("Done\n")
 
-cat("Checking for Excel files in the directory..,\n")
+cat("Checking for Excel files in the directory...\n")
 filepaths <- find_excel_files()
 
-cat("Importing the data from Excel into R... ")
+cat("Importing details of Excel file(s) into R... ")
 excelList <- lapply(filepaths, excelFile)
 
-df.ls <- extract(excelList[[1]])
+df.ls <- extract_spreadsheets(excelList[[1]])
 len <- length(excelList)
 if (len > 1) {
     for (i in 2:len) {
-        tmp <- extract(excelList[[i]])
+        tmp <- extract_spreadsheets(excelList[[i]])
         df.ls <- append(df.ls, tmp)
     }
     df_row_num <- sapply(df.ls, nrow)
@@ -47,7 +47,7 @@ df.ls <- lapply(df.ls, function(df) {
 cat("Done\n")
 
 cat("Working on date-related columns... ")
-df.ls <- lapply(df.ls, fix_funny_date_entries, focusCol = columnNames)
+df.ls <- lapply(df.ls, fix_funny_date_entries, focusCol = columnNames[6:9])
 cat("Done\n")
 
 cat("Updating original headers... ")
