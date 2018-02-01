@@ -339,7 +339,11 @@ set_datatypes <- function(df) {
 
 ## Fixes up phone numbers to a uniform text format
 fix_phone_numbers <- function(column) {
-    invisible(column <- column %>%
+    column <-
+        ifelse(nchar(column) > 11 | nchar(column) < 10, NA_character_, column)
+    
+    ## TODO: Check for invalid numbers with normal lengths
+    invisible(column %>%
                   as.character() %>%
                   gsub("^([1-9])", "0\\1", .))
 }
@@ -361,8 +365,7 @@ fix_funny_date_entries <-
         
         ## Identify funny column and if non-existent exit unchanged, that is
         ## spreadsheets that do not have any of these columns are skipped
-        if (length(focusCol) != 4)
-            stop("focusCol should be of length == 4")
+        stopifnot(length(focusCol) == 4)
         
         fields <- colnames(df)
         awkward <- c("BDAY/WED ANN",
