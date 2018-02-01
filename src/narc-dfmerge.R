@@ -2,7 +2,8 @@
 
 ## Copyright (c) 2018 Dev Solutions
 
-source("helpers.R")
+source(file.path(getwd(), "src/helpers.R"))
+
 notice()
 
 ## Ensure the availability and attachment of needed R extensions
@@ -20,7 +21,9 @@ filepaths <- find_excel_files()
 
 cat("Importing details of Excel file(s) into R... ")
 excelList <- lapply(filepaths, excelFile)
+rm(filepaths)
 
+# In case there's more than one spreadsheet
 df.ls <- extract_spreadsheets(excelList[[1]])
 len <- length(excelList)
 if (len > 1) {
@@ -31,6 +34,8 @@ if (len > 1) {
     df_row_num <- sapply(df.ls, nrow)
     df.ls <- df.ls[which(df_row_num != 0)]
 }
+
+rm(excelList)
 cat("Done\n")
 
 cat("Identifying and afixing original headers... ")
@@ -60,9 +65,10 @@ cat("Done\n")
 
 cat("Merging data frames... ")
 master <- combine_dfs(df.ls)
+rm(df.ls)
 cat("Done\n")
 
-cat("Setting types... ")
+cat("Setting the data types... ")
 master <- set_datatypes(master)
 cat("Done\n")
 
@@ -73,21 +79,28 @@ if (!dir.exists(folder))
 cat("Done\n")
 
 cat("Writing to database... ")
-dbFile <- "NARC-mailing-list.db"
-dbTable <- "NARC_mail_3"
 
-con <- dbConnect(SQLite(), file.path(folder, dbFile))
+con <- dbConnect(SQLite(), file.path(folder, "NARC-mailing-list.db"))
 if (!dbIsValid(con))
     stop("Connection to database failed.")
 
+dbTable <- "NARC_mail_raw"
 dbWriteTable(conn = con, dbTable, master, append = TRUE)
 
 ## Deal with wholesale replications
-tmp <- dbReadTable(con, dbTable) %>% distinct()
-dbWriteTable(con, dbTable, tmp, overwrite = TRUE)
-dbDisconnect(con)
-if (dbIsValid(con))
-    warning("The database is not properly disconnected from the R session.")
-cat("Done\n")
+master <- dbReadTable(con, dbTable) %>%
+    distinct() %>%
+    dbWriteTable(con, dbTable, ., overwrite = TRUE)
 
+## Close shop...
+dbDisconnect(con)
+if (dbIsValid(con)) {
+    warning("The database is not properly disconnected from the R session.")
+} else {
+    rm(con)
+    cat("Done\n")
+}
+
+# rm(list = ls())
 cat("\nThat's all.\n")
+
