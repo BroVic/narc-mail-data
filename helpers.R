@@ -316,7 +316,7 @@ combine_dfs <- function(dfs) {
 ## Sets the columns to the appropriate data types
 set_datatypes <- function(df) {
     df$serialno <- seq_along(df$serialno)
-    df$phone <- fix_phone_numbers(df$phone)
+    df$phone <- .fix_phone_numbers(df$phone)
     
     ## TODO: Undo hard coding
     for (i in c(2, 4:5))
@@ -337,15 +337,21 @@ set_datatypes <- function(df) {
 
 
 
-## Fixes up phone numbers to a uniform text format
-fix_phone_numbers <- function(column) {
-    column <-
-        ifelse(nchar(column) > 11 | nchar(column) < 10, NA_character_, column)
+## Fixes up mobile numbers to a uniform text format
+.fix_phone_numbers <- function(column) {
     
-    ## TODO: Check for invalid numbers with normal lengths
-    invisible(column %>%
-                  as.character() %>%
-                  gsub("^([1-9])", "0\\1", .))
+    # Remove entries that are beyond redemption i.e. too long or too short
+    column <- column %>%
+        ifelse(nchar(.) > 11 | nchar(.) < 10, NA_character_, .)
+    
+    # Add a leading '0' if there are 10 digits
+    column <- column %>%
+        as.character() %>%
+        gsub("(^[0-9]{10}$)", "0\\1", .)
+    
+    # Remove those that still don't look like local mobile numbers (NG)
+    column <- column %>%
+        ifelse(grepl("^0[7-9][0-1][0-9]{8}$", .), ., NA_character_)
 }
 
 
