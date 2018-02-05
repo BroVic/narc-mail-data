@@ -1,7 +1,7 @@
 # test.R
 
 library(testthat)
-library(dplyr)
+suppressPackageStartupMessages(library(dplyr))
 library(readxl)
 library(stringr)
 
@@ -69,6 +69,24 @@ test_that("Spreadsheets are properly extracted", {
 
 
 ###################################
+context("Regex pattern matching")
+
+test_that("Object class with regex patterns is properly instantiated", {
+    column <-
+        c("24 Feb/7 Sept",
+          "43322",
+          "17 January",
+          "15 Oct",
+          NA,
+          "May 5/Jun 12",
+          "6/04")
+    
+    ## To be continued... 
+})
+
+
+
+###################################
 context("Ensuring data integrity.")
 
 test_that("Wrong mobile numbers are repaired or removed.", {
@@ -97,9 +115,32 @@ test_that("Wrong mobile numbers are repaired or removed.", {
 
 ##################################################
 context("Structural modification of data frames")
-# 
-# df1 <- update_header(singleWrkSht1, header)
-# df2 <- update_header(singleWrkSht2, header)
+
+test_that("'Month' values are corrected.", {
+    mths.df <- data.frame(month = c("Apl",
+                                    "oct ",
+                                    "September",
+                                    "Jul",
+                                    "january",
+                                    "aug",
+                                    "decc"),
+                          stringsAsFactors = FALSE)
+    fail.df <- data.frame(month = c("May/Jun 12", "24 Feb/Sept"),
+                          stringsAsFactors = FALSE)
+    
+    mths <- .fix_mth_entries(mths.df)
+    
+    expect_equal(mths[[1]][1], "April")
+    expect_equal(mths[[1]][2], "October")
+    expect_equal(mths[[1]][3], "September")
+    expect_equal(mths[[1]][4], "July")
+    expect_equal(mths[[1]][5], "January")
+    expect_equal(mths[[1]][6], "August")
+    expect_equal(mths[[1]][7], "December")
+    expect_error(.fix_mth_entries(as_tibble("Mar.")),
+                 "Cannot correct month entries")
+    expect_error(.fix_mth_entries(fail.df), "Cannot correct")
+})
 
 test_that("Date entries are fixed", {
     mail1 <- data.frame(Name = c("Abe McDonald", "Max Horst", "Ada Obi"),
@@ -109,7 +150,7 @@ test_that("Date entries are fixed", {
     mail2 <- data.frame(
         NAME = c("Heather Rowe", "Zainab Umar", "Tinuke"),
         `BIRTHDAY AND WED ANN` = c("12 June 1982", "Apl. 23", "23rd Dec"),
-        `BDAY/WED ANN` = c(NA, "10/4", "January 5th"),
+        `WED ANN` = c("", "10/4", "January 5th"),
         stringsAsFactors = FALSE, check.names = FALSE)
     
     newDates1 <- fix_funny_date_entries(mail1)
@@ -123,15 +164,40 @@ test_that("Date entries are fixed", {
     expect_false(ncol(mail1) == ncol(newDates1))
     expect_false(ncol(mail2) == ncol(newDates2))
     expect_equal(newDates1$bday.day[1], "12")
-    # expect_equal(newDates1$bday.mth[1], "Oct")
+    expect_equal(newDates1$bday.mth[1], "October")
     expect_equal(newDates1$bday.day[2], "13")
-    # expect_equal(newDates1$bday.mth[2], "June")
-    # expect_equal(newDates1$bday.day[3], "18")
-    # expect_equal(newDates1$bday.mth[3], "March")
-    # expect_equal(newDates2$bday.day[1], "12")
-    # expect_equal(newDates2$bday.mth[1], "Oct")
-    expect_equal(newDates2$bday.day[2], "10")
+    expect_equal(newDates1$bday.mth[2], "June")
+    expect_equal(newDates1$bday.day[3], "18")
+    expect_equal(newDates1$bday.mth[3], "March")
+    expect_equal(newDates2$bday.day[1], "12")
+    expect_equal(newDates2$bday.mth[1], "June")
+    expect_equal(newDates2$bday.day[2], "23")
     expect_equal(newDates2$bday.mth[2], "April")
-    # expect_equal(newDates2$bday.day[3], "18")
-    # expect_equal(newDates2$bday.mth[3], "March")
+    expect_equal(newDates2$bday.day[3], "23")
+    expect_equal(newDates2$bday.mth[3], "December")
+})
+
+test_that("Numeric Excel date entries are converted to text format.", {
+    result <- .convert_num_date_to_char(c("41235", "43322"))
+    
+    expect_equal(result[1], "22 November")
+    expect_equal(result[2], "10 August")
+})
+
+test_that("Unwanted characters/entries are removed entirely", {
+    
+    smpl <- c("24 Feb/Sept",
+              "Mar/Jun 10",
+              "April. 4",
+              "Aug, 6",
+              "12/05/1989",
+              "31 Oct/6 July")
+    smpl <- .preprocess_date_entry(smpl)
+    
+    expect_equal(smpl[1], "")
+    expect_equal(smpl[2], "")
+    expect_equal(smpl[3], "April  4")
+    expect_equal(smpl[4], "Aug  6")
+    expect_equal(smpl[5], "12/05")
+    expect_equal(smpl[6], "31 Oct/6 July")  # unchanged
 })
