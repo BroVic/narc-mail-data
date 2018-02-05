@@ -11,7 +11,6 @@ cat("Loading required packages... ")
 load_packages(pkgs = c("DBI",
                        "RSQLite",
                        "dplyr",
-                       "lubridate",
                        "readxl",
                        "stringr"))
 cat("Done\n")
@@ -52,7 +51,7 @@ df.ls <- lapply(df.ls, function(df) {
 cat("Done\n")
 
 cat("Working on date-related columns... ")
-df.ls <- lapply(df.ls, fix_funny_date_entries, focusCol = columnNames[6:9])
+df.ls <- lapply(df.ls, fix_funny_date_entries)
 cat("Done\n")
 
 cat("Updating original headers... ")
