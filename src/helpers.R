@@ -186,7 +186,8 @@ find_excel_files <- function(path = ".") {
     # TODO: There are situations when a file's extension
     # may not be specified and thus there may be need to
     # test such files to know whether they are of the format.
-    xlFiles <- list.files(path, pattern = ".xlsx$|.xls$") %>%
+    xlFiles <-
+        list.files(path, pattern = ".xlsx$|.xls$", full.names = TRUE) %>%
         subset(!grepl("^~", .))    # remove any backup files (Windows)
     
     numFiles <- length(xlFiles)
@@ -196,15 +197,15 @@ find_excel_files <- function(path = ".") {
         cat(sprintf(
             ngettext(
                 numFiles,
-                "\t%d Excel file was found:\n",
-                "\t%d Excel files were found:\n"
+                "\t%d Excel file was found in %s:\n",
+                "\t%d Excel files were found in %s:\n"
             ),
-            numFiles
+            numFiles, sQuote(path.expand(path))
         ))
         
         ## List the files
         sapply(xlFiles, function(x) {
-            cat(sprintf("\t  * %s\n", x))
+            cat(sprintf("\t  * %s\n", basename(x)))
         })
     }
     

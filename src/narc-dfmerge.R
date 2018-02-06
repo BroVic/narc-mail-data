@@ -2,6 +2,8 @@
 
 ## Copyright (c) 2018 DevSolutions
 
+path <- commandArgs(trailingOnly = TRUE)
+
 source(file.path(getwd(), "src/helpers.R"))
 
 notice()
@@ -16,7 +18,7 @@ load_packages(pkgs = c("DBI",
 cat("Done\n")
 
 cat("Checking for Excel files in the directory...\n")
-filepaths <- find_excel_files()
+filepaths <- find_excel_files(path)
 
 cat("Importing details of Excel file(s) into R... ")
 excelList <- lapply(filepaths, excelFile)
@@ -72,7 +74,7 @@ master <- set_datatypes(master)
 cat("Done\n")
 
 cat("Creating output directory... ")
-folder <- "harmonised-data"
+folder <- file.path(path, "harmonised-data")
 if (!dir.exists(folder))
     dir.create(folder)
 cat("Done\n")

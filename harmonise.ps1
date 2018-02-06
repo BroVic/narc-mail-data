@@ -1,3 +1,5 @@
-﻿# harmonise.ps1
+# harmonise.ps1
 
-Rscript .\src\narc-dfmerge.R
+$directory=$args[0]
+
+Rscript .\src\narc-dfmerge.R $directory
