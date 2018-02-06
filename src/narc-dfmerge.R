@@ -1,6 +1,6 @@
 # narc-dfmerge.R
 
-## Copyright (c) 2018 Dev Solutions
+## Copyright (c) 2018 DevSolutions
 
 source(file.path(getwd(), "src/helpers.R"))
 
@@ -83,7 +83,7 @@ con <- dbConnect(SQLite(), file.path(folder, "NARC-mailing-list.db"))
 if (!dbIsValid(con))
     stop("Connection to database failed.")
 
-dbTable <- "NARC_mail_raw"
+dbTable <- "NARC_mail"
 dbWriteTable(conn = con, dbTable, master, append = TRUE)
 
 ## Deal with wholesale replications
@@ -100,6 +100,6 @@ if (dbIsValid(con)) {
     cat("Done\n")
 }
 
-# rm(list = ls())
+rm(list = ls())
 cat("\nThat's all.\n")
 

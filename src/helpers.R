@@ -124,12 +124,12 @@ regexPatterns <- list(
 
 ## Derive the indices of entries within our awkward column
 ## that match the patterns, respectively
-regexIndices <- function(regexPatterns, column) {
-    twoNum <- grep(regexPatterns$slash_with_two_nums, column)
-    eitherMth <- grep(regexPatterns$slash_day_and_mth, column)
-    single_day_f <- grep(regexPatterns$single_day_first, column)
-    single_mth_f <- grep(regexPatterns$single_mth_first, column)
-    numeral <- grep(regexPatterns$date_numeral, column)
+regexIndices <- function(rule = regexPatterns, col = column) {
+    twoNum <- grep(rule$slash_with_two_nums, col, ignore.case = TRUE)
+    eitherMth <- grep(rule$slash_day_and_mth, col, ignore.case = TRUE)
+    single_day_f <- grep(rule$single_day_first, col, ignore.case = TRUE)
+    single_mth_f <- grep(rule$single_mth_first, col, ignore.case = TRUE)
+    numeral <- grep(rule$date_numeral, col, ignore.case = TRUE)
     
     if (anyDuplicated(c(twoNum, eitherMth, single, numeral)))
         stop("There was a pattern-matching conflict for the date columns.")
@@ -430,7 +430,8 @@ set_datatypes <- function(df) {
 
 
 
-fix_funny_date_entries <- function(df, verbose = FALSE) {
+fix_funny_date_entries <- function(df) {
+    
     ## Temporary data frame based on the new columns
     focusCol <-
         c("bday.day", "bday.mth", "wedann.day", "wedann.mth")
@@ -462,7 +463,7 @@ fix_funny_date_entries <- function(df, verbose = FALSE) {
         tmpDf <-  .process_awkward_cols(df, tmpDf, indexAwkward)
         
         df <- bind_cols(df, tmpDf)
-        df <- df[,-indexAwkward]
+        df <- df[, -indexAwkward]
     }
     
     invisible(df)
@@ -674,15 +675,14 @@ fix_funny_date_entries <- function(df, verbose = FALSE) {
     }  # end of outermost loop
     
     ## Correct abbreviated month entries to full month names
+    ## TODO: Encapsulate these statements within the function as well
     indexMonthColumns <-
         which(endsWith(colnames(temp.df), "mth"))
-    
-    
-    
-    for (col in indexMonthColumns)
-        temp.df[, col] <- .fix_mth_entries(temp.df[, col])
-    
-    print(temp.df)
+    for (col in indexMonthColumns) {
+        months <- unlist(temp.df[, col])
+        temp.df[, col] <- .fix_mth_entries(months)
+    }
+    temp.df
 }
 
 
@@ -722,11 +722,11 @@ fix_funny_date_entries <- function(df, verbose = FALSE) {
         number <- as.numeric(number)
     ## TODO: Add condition for case where full date is counted
     ## and the year is not the present year (use min reasonable value)
+    ## 2. Also do not accept dates that are in the future
     
-    correction <- 2
+    correction <- 2L
     dateString <-
         format(as.Date(number - correction, origin = "1900-01-01"), "%d %B")
-    dateString
 }
 
 
@@ -761,28 +761,31 @@ fix_funny_date_entries <- function(df, verbose = FALSE) {
 
 
 
-## Corrects abbreviated or badly entered 'month' values
-.fix_mth_entries <- function(mth.col = character()) {
-    mth.col <- mth.col[, 1]
-    if (any(grepl("[[:punct:]]", unlist(mth.col))))
-        stop("Cannot correct month entries with punctuation characters.")
+## Corrects abbreviated or badly entered 'month' values.
+## Should accept only alphabetical characters.
+.fix_mth_entries <- function(mth.col) {
+    stopifnot(is.vector(mth.col))
+    
+    isInvalid <- grepl("[[:punct:]]|[[:digit:]]", mth.col)
+    if (any(isInvalid)) {
+        pos <- which(isInvalid)
+        stop(sprintf("An invalid character was found at position %d.", pos))
+    }
     
     sapply(mth.col, function(string) {
         string %>%
             str_trim() %>%
-            gsub("^(Ja|F|Mar|Ap|May|Jun|Jul|Au|S|O|N|D)\\w*$",
-                 "\\1",
-                 .,
-                 ignore.case = TRUE) %>%
+            gsub(
+                "^(Ja|F|Mar|Ap|May|Jun|Jul|Au|S|O|N|D)[[:alpha:]]*$",
+                "\\1",
+                .,
+                ignore.case = TRUE
+            ) %>%
             str_to_title() %>%
             pmatch(month.name) %>%
             month.name[.]
-    }) %>%
-        as_tibble()
+    }) %>% as_tibble()
 }
-
-
-
 
 
 

@@ -117,18 +117,10 @@ test_that("Wrong mobile numbers are repaired or removed.", {
 context("Structural modification of data frames")
 
 test_that("'Month' values are corrected.", {
-    mths.df <- data.frame(month = c("Apl",
-                                    "oct ",
-                                    "September",
-                                    "Jul",
-                                    "january",
-                                    "aug",
-                                    "decc"),
-                          stringsAsFactors = FALSE)
-    fail.df <- data.frame(month = c("May/Jun 12", "24 Feb/Sept"),
-                          stringsAsFactors = FALSE)
-    
-    mths <- .fix_mth_entries(mths.df)
+    mths <- 
+        c("Apl", "oct ", "September", "Jul", "january", "aug", "decc", "  March")
+    mths <- .fix_mth_entries(mths)
+    failed <- c("May/Jun 12", "24 Feb/Sept")
     
     expect_equal(mths[[1]][1], "April")
     expect_equal(mths[[1]][2], "October")
@@ -137,9 +129,10 @@ test_that("'Month' values are corrected.", {
     expect_equal(mths[[1]][5], "January")
     expect_equal(mths[[1]][6], "August")
     expect_equal(mths[[1]][7], "December")
-    expect_error(.fix_mth_entries(as_tibble("Mar.")),
-                 "Cannot correct month entries")
-    expect_error(.fix_mth_entries(fail.df), "Cannot correct")
+    expect_equal(mths[[1]][8], "March")
+    expect_error(.fix_mth_entries("Mar."),
+                 "An invalid character was found at position 1.")
+    expect_error(.fix_mth_entries(failed), "An invalid character")
 })
 
 test_that("Date entries are fixed", {
@@ -184,6 +177,7 @@ test_that("Numeric Excel date entries are converted to text format.", {
     expect_equal(result[2], "10 August")
 })
 
+
 test_that("Unwanted characters/entries are removed entirely", {
     
     smpl <- c("24 Feb/Sept",
@@ -194,7 +188,7 @@ test_that("Unwanted characters/entries are removed entirely", {
               "31 Oct/6 July")
     smpl <- .preprocess_date_entry(smpl)
     
-    expect_equal(smpl[1], "")
+    expect_equal(smpl[1], "24 Feb")
     expect_equal(smpl[2], "")
     expect_equal(smpl[3], "April  4")
     expect_equal(smpl[4], "Aug  6")
