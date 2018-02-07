@@ -53,7 +53,7 @@ df.ls <- lapply(df.ls, function(df) {
 cat("Done\n")
 
 cat("Working on date-related columns... ")
-df.ls <- lapply(df.ls, fix_funny_date_entries)
+df.ls <- lapply(df.ls, fix_date_entries)
 cat("Done\n")
 
 cat("Updating original headers... ")
