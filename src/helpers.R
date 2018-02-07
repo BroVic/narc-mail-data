@@ -124,7 +124,7 @@ regexPatterns <- list(
 
 ## Derive the indices of entries within our awkward column
 ## that match the patterns, respectively
-regexIndices <- function(rule = regexPatterns, col = column) {
+regexIndices <- function(rule, col) {
     twoNum <- grep(rule$slash_with_two_nums, col, ignore.case = TRUE)
     eitherMth <- grep(rule$slash_day_and_mth, col, ignore.case = TRUE)
     single_day_f <- grep(rule$single_day_first, col, ignore.case = TRUE)
@@ -484,7 +484,7 @@ fix_funny_date_entries <- function(df) {
     for (topIndex in awkColIndex) {
         nameCurrCol <- colnames(main.df)[topIndex]
         main.df[[topIndex]] <-
-            sapply(main.df[[topIndex]], .preprocess_date_entry)
+            sapply(main.df[[topIndex]], .initial_date_proc)
         
         ## Instantiate an object of class regexIndices
         index <-
@@ -736,10 +736,13 @@ fix_funny_date_entries <- function(df) {
 
 
 
-## Removes characters that are not required in the date entries
-## Get rid of ordinal qualifiers, and then remove dots,
-## commas and hyphens from all entries, and trim whitespace
-.preprocess_date_entry <- function(entry) {
+## Removes characters that are not required for date entries
+## - 'months' that have no 'day' specified,
+## - 'year' entries,
+## - ordinal qualifiers, 
+## - dots, commas and hyphens, and
+## - whitespace
+.initial_date_proc <- function(entry) {
     entry %>%
         str_replace("(^\\s*[[:digit:]]{1,2}\\s+[[:alpha:]]+)/[[:alpha:]]+\\s*$",
                     replacement = "\\1") %>%
@@ -792,7 +795,59 @@ fix_funny_date_entries <- function(df) {
 
 
 
+
+
+
+
+## Moves down a column with date entries to carry out
+## necessary processing
+## Returns a two column data frame of days and months
+.process_date_entry <- function(patterns, column) {
+    lapply(column, function(str) {
+        if (is.na(str) || identical(str, "")) {
+            df <- data.frame(matrix(NA, ncol = 2))
+        }
+        else {
+            lapply(patterns, function(p) {
+                if (grepl(pattern = p, str)) {
+                    .distribute_vals(str, p) %>%
+                        as.data.frame()
+                }
+            })
+        }
+    }) %>%
+        bind_rows()
+}
+
+
+
+
+
+
+
+
+## Distributes parts of a data entry to appropriate 'day' & 'month' columns
+.distribute_vals <- function(x, pat) {
+    if (identical(pat, "(^[[:alpha:]]{3,})(\\s)+([[:digit:]]{1,2})")) {
+        bkrefs <- c("\\3", "\\1")
+    } ## TODO: Add a condition for numeral entries
+    else {
+        bkrefs <- c("\\1", "\\3")
+    }
+    lapply(bkrefs, function(b) {
+        val <- x %>%
+            str_replace(pattern = pat, replacement = b) %>%
+            str_trim()
+    })
+}
+
+
+
+
+
+
+
 notice <- function() {
-    cat("Copyright (c) Dev Solutions 2018. All rights reserved.\n")
+    cat("Copyright (c) DevSolutions 2018. All rights reserved.\n")
     cat("  NOTICE: This software is provided without any warranty.\n\n")
 }
