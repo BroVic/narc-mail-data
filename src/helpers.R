@@ -502,7 +502,7 @@ fix_date_entries <- function(df) {
         column <- sapply(column, .convert_num_date_to_char)
         .distribute_vals(temp.df, column = column, patterns = patterns)
 #################        
-    })
+    })   
     
     monthColumns <-
         which(endsWith(colnames(temp.df), "mth"))
@@ -664,7 +664,6 @@ fix_date_entries <- function(df) {
 #         gsub(drop, "", .) %>%
 #         str_trim()
 # }
-
 
 
 
