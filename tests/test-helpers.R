@@ -1,6 +1,6 @@
 # test.R
 
-library(testthat)
+suppressPackageStartupMessages(library(testthat))
 suppressPackageStartupMessages(library(dplyr))
 library(readxl)
 library(stringr)
