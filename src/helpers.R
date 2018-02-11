@@ -188,7 +188,7 @@ find_excel_files <- function(path = ".") {
     # test such files to know whether they are of the format.
     xlFiles <-
         list.files(path, pattern = ".xlsx$|.xls$", full.names = TRUE) %>%
-        subset(!grepl("^~", .))    # remove any backup files (Windows)
+        subset(!grepl("(~\\$)+", .))    # remove any backup files (Windows)
     
     numFiles <- length(xlFiles)
     if (!numFiles) {
@@ -230,7 +230,7 @@ locate_header <- function(df, hdr, quietly = TRUE) {
         stop("'hdr' is not a character vector")
     
     ## Iterate row-wise
-    val <- list()
+    val <- NULL
     for (i in 1:nrow(df)) {
         ## Check whether we hit something that looks like column names
         ## and when we do, stop looking.
