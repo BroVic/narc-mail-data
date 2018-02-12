@@ -2,10 +2,10 @@
 
 ## Copyright (c) 2018 DevSolutions
 
-path <- commandArgs(trailingOnly = TRUE)
+if (!interactive())
+    path <- commandArgs(trailingOnly = TRUE)
 
 source(file.path(getwd(), "src/helpers.R"))
-
 notice()
 
 ## Ensure the availability and attachment of needed R extensions
@@ -40,20 +40,25 @@ rm(excelList)
 cat("Done\n")
 
 cat("Identifying and afixing original headers... ")
+
 df.ls <- lapply(df.ls, function(df) {
     val <- locate_header(df, hdr = columnNames)
-    df <- df %>%
-        slice(val$nextrow:n())
-    
-    if (!identical(ncol(df), length(val$header)))
-        stop("Mismatched dimensions of existing and updated headers.")
-    colnames(df) <- val$header
-    df
+    if (!is.null(val)) {
+        df <- df %>%
+            slice(val$nextrow:n())
+        if (!identical(ncol(df), length(val$header)))
+            stop("Mismatched dimensions of existing and updated headers.")
+        colnames(df) <- val$header
+        df
+    }
+    else {
+        df <- data.frame(0)
+    }
 })
 cat("Done\n")
 
 cat("Working on date-related columns... ")
-df.ls <- lapply(df.ls, fix_date_entries)
+df.ls <- lapply(df.ls, fix_funny_date_entries)
 cat("Done\n")
 
 cat("Updating original headers... ")
@@ -81,7 +86,8 @@ cat("Done\n")
 
 cat("Writing to database... ")
 
-con <- dbConnect(SQLite(), file.path(folder, "NARC-mailing-list.db"))
+con <-
+    dbConnect(SQLite(), file.path(folder, "NARC-mailing-list.db"))
 if (!dbIsValid(con))
     stop("Connection to database failed.")
 
@@ -104,4 +110,3 @@ if (dbIsValid(con)) {
 
 rm(list = ls())
 cat("\nThat's all.\n")
-

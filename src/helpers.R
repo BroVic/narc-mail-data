@@ -247,7 +247,7 @@ locate_header <- function(df, hdr, quietly = TRUE) {
         stop("'hdr' is not a character vector")
     
     ## Iterate row-wise
-    val <- list()
+    val <- NULL
     for (i in 1:nrow(df)) {
         ## Check whether we hit something that looks like column names
         ## and when we do, stop looking.
@@ -275,6 +275,7 @@ locate_header <- function(df, hdr, quietly = TRUE) {
     }
     invisible(val)
 }
+
 
 
 
