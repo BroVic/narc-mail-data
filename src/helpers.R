@@ -293,7 +293,7 @@ update_header <- function(df, newCol) {
         else if (grepl("number|phone", tolower(thisCol)))
             thisCol <- newCol[3]
         else if (grepl("ress$", tolower(thisCol))
-                 & !newCol[4] %in% tolower(thisCol))
+                 && !grepl("email", tolower(thisCol)))
             thisCol <- newCol[4]
         else if (newCol[5] %in% tolower(thisCol))
             thisCol <- newCol[5]
@@ -313,8 +313,6 @@ update_header <- function(df, newCol) {
             thisCol <- newCol[12]
         else if (grepl("know", thisCol, ignore.case = TRUE))
             thisCol <- newCol[13]
-        
-        ## Note: [6] - [9] have been taken care of in an earlier step.
     })
     colnames(df) <- modifiedHdr
     invisible(df)
