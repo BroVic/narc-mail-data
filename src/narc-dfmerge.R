@@ -2,8 +2,21 @@
 
 ## Copyright (c) 2018 DevSolutions
 
-if (!interactive())
+default <- "../workbooks"
+if (!interactive()) {
     path <- commandArgs(trailingOnly = TRUE)
+} else {
+    if (identical(.Platform$OS.type, "windows")) {
+        opt <- menu(choices = c("Select a folder", "Use default"),
+                    graphics = TRUE)
+        if (identical(opt, 1L)) {
+            path <- choose.dir()
+        }
+        else if (identical(opt, 2L)) {
+            cat("Using default folder", sQuote(default))
+        }
+    }
+}
 
 source(file.path(getwd(), "src/helpers.R"))
 notice()
