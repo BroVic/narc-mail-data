@@ -2,7 +2,7 @@
 
 ## Copyright (c) 2018 DevSolutions
 
-default <- "../workbooks"
+default <- "workbooks"
 if (!interactive()) {
     path <- commandArgs(trailingOnly = TRUE)
 } else {
@@ -14,7 +14,9 @@ if (!interactive()) {
         }
         else if (identical(opt, 2L)) {
             cat("Using default folder", sQuote(default))
+            path <- default
         }
+        else stop("No folder was selected")
     }
 }
 
@@ -71,7 +73,7 @@ df.ls <- lapply(df.ls, function(df) {
 cat("Done\n")
 
 cat("Working on date-related columns... ")
-df.ls <- lapply(df.ls, fix_funny_date_entries)
+df.ls <- lapply(df.ls, fix_date_entries)
 cat("Done\n")
 
 cat("Updating original headers... ")

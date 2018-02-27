@@ -72,7 +72,7 @@ test_that("Spreadsheets are properly extracted", {
 context("Regex pattern matching")
 
 test_that("Object class with regex patterns is properly instantiated", {
-    column <-
+    column <- 
         c("24 Feb/7 Sept",
           "43322",
           "17 January",
@@ -80,8 +80,11 @@ test_that("Object class with regex patterns is properly instantiated", {
           NA,
           "May 5/Jun 12",
           "6/04")
+        attr(column, "name") <- "BDAY"
+    pat <- regexPatterns()
+    ind <- regexIndices(pat, column)
     
-    ## To be continued... 
+    expect_error(regexIndices(pat, col), "Numbers-only values must be")
 })
 
 
