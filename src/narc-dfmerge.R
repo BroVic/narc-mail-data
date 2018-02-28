@@ -2,8 +2,23 @@
 
 ## Copyright (c) 2018 DevSolutions
 
-if (!interactive())
+default <- "workbooks"
+if (!interactive()) {
     path <- commandArgs(trailingOnly = TRUE)
+} else {
+    if (identical(.Platform$OS.type, "windows")) {
+        opt <- menu(choices = c("Select a folder", "Use default"),
+                    graphics = TRUE)
+        if (identical(opt, 1L)) {
+            path <- choose.dir()
+        }
+        else if (identical(opt, 2L)) {
+            cat("Using default folder", sQuote(default))
+            path <- default
+        }
+        else stop("No folder was selected")
+    }
+}
 
 source(file.path(getwd(), "src/helpers.R"))
 notice()
@@ -58,7 +73,7 @@ df.ls <- lapply(df.ls, function(df) {
 cat("Done\n")
 
 cat("Working on date-related columns... ")
-df.ls <- lapply(df.ls, fix_funny_date_entries)
+df.ls <- lapply(df.ls, fix_date_entries)
 cat("Done\n")
 
 cat("Updating original headers... ")

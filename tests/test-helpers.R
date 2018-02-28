@@ -72,7 +72,7 @@ test_that("Spreadsheets are properly extracted", {
 context("Regex pattern matching")
 
 test_that("Object class with regex patterns is properly instantiated", {
-    column <-
+    column <- 
         c("24 Feb/7 Sept",
           "43322",
           "17 January",
@@ -80,8 +80,11 @@ test_that("Object class with regex patterns is properly instantiated", {
           NA,
           "May 5/Jun 12",
           "6/04")
+        attr(column, "name") <- "BDAY"
+    pat <- regexPatterns()
+    ind <- regexIndices(pat, column)
     
-    ## To be continued... 
+    expect_error(regexIndices(pat, col), "Numbers-only values must be")
 })
 
 
@@ -146,8 +149,8 @@ test_that("Date entries are fixed", {
         `WED ANN` = c("", "10/4", "January 5th"),
         stringsAsFactors = FALSE, check.names = FALSE)
     
-    newDates1 <- fix_funny_date_entries(mail1)
-    newDates2 <- fix_funny_date_entries(mail2)
+    newDates1 <- fix_date_entries(mail1)
+    newDates2 <- fix_date_entries(mail2)
 
     # Add a test for cases when there are no funny looking columns
     expect_is(newDates1, "data.frame")
@@ -194,4 +197,20 @@ test_that("Unwanted characters/entries are removed entirely", {
     expect_equal(smpl[4], "Aug  6")
     expect_equal(smpl[5], "12/05")
     expect_equal(smpl[6], "31 Oct/6 July")  # unchanged
+})
+
+
+test_that("Values of date entries are properly allocated to columns", {
+    testPat <- regexPatterns()
+    
+    dM <- .distribute_vals("3 May", testPat$single_day_first)
+    mD <- .distribute_vals("May 3", testPat$single_mth_first)
+    
+    expect_type(dM, "list")
+    expect_type(mD, "list")
+    expect_type(.distribute_vals("43322", date_num), "list")
+    expect_equal(dM[[1]], "3")
+    expect_equal(dM[[2]], "May")
+    expect_equal(mD[[1]], "3")
+    expect_equal(mD[[2]], "May")
 })

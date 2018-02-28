@@ -1,88 +1,8 @@
 # helpers.R
 
-################################
-## S3 constructor and methods ##
-################################
-
-## Constructs S3 objects of class 'excelFile'
-excelFile <- function(file) {
-    ## Get individual spreadsheets
-    sheetNames <-  readxl::excel_sheets(file)
-    
-    sheetList <- lapply(sheetNames, function(sht) {
-        read_excel(path = file,
-                   sheet = sht,
-                   col_types = "text")
-    })
-    
-    ## Use file properties and data to build an object
-    prop <- file.info(file)
-    
-    exf <- structure(
-        list(
-            fileName = file,
-            fileSize = prop$size,
-            created = prop$ctime,
-            modified = prop$mtime,
-            noOfSheets = length(sheetNames),
-            sheets = sheetNames,
-            data = sheetList
-        ),
-        class = "excelFile"
-    )
-    invisible(exf)
-}
-
-
-## Provides output information on the object
-print.excelFile <- function(xlObj) {
-    cat(sprintf(
-        ngettext(
-            xlObj$noOfSheets,
-            "Filename: %s with %s spreadsheet.\n",
-            "Filename: %s with %s spreadsheets.\n"
-        ),
-        xlObj$fileName,
-        xlObj$noOfSheets
-    ))
-    cat("Data: \n")
-    print(xlObj$data)
-}
-
-
-## Provides a summary of the object
-summary.excelFile <- function(xlobj) {
-    cat(paste0(
-        "File: ",
-        sQuote(xlObj$fileName),
-        ". Size:",
-        xlObj$fileSize,
-        "B\n"
-    ))
-    cat("Spreadsheet(s):\n")
-    for (i in 1:xlObj$noOfSheets) {
-        cat(paste0(i, ". ", sQuote(xlObj$sheets), "\n"))
-    }
-}
-
-
-## Define generic and default method for extracting spreadsheets
-extract_spreadsheets <-
-    function(x)
-        UseMethod("extract_spreadsheets")
-
-extract_spreadsheets.excelFile <- function(fileObj)
-    lapply(fileObj$data, function(dat)
-        dat)
-
-extract_spreadsheets.default <- function(x)
-    "Unknown class."
-
-
-
-#######################
-##  Base data types  ##
-#######################
+#####################################
+##         Base data types         ##
+#####################################
 
 ## The names of the columns of the new table
 columnNames <- c(
@@ -101,55 +21,160 @@ columnNames <- c(
     "info.source"
 )
 
+################################
+##         S3 objects         ##
+################################
 
-## Regular expressions:
-## We establish the pattern for entries that have:
-## => two numbers separated by a forward slash e.g. 10/6
-## => two day-month combos separated by a fwd slash e.g. May 6/June 12
-## => a "DD Month" e.g. 15 Oct
-## => an Excel date numeral e.g. "43322" equiv. to 12 Aug 2018
-## => entries that have three date fields e.g. 13/03/2001, 13th March 2001
-
-regexPatterns <- list(
-    slash_with_two_nums = "(^[[:digit:]]{1,2})(/)([[:digit:]]{1,2}$)",
-    slash_day_and_mth = "(^[[:print:]]{5,})(/)([[:print:]]{5,}$)",
-    single_day_first = "(^[[:digit:]]{1,2})(\\s)+([[:alpha:]]{3,}$)",
-    single_mth_first = "(^[[:alpha:]]{3,})(\\s)+([[:digit:]]{1,2})",
-    date_numeral = "[0-9]{5}"
-)
-
-
-
-
-
-## Derive the indices of entries within our awkward column
-## that match the patterns, respectively
-regexIndices <- function(rule = regexPatterns, col = column) {
-    twoNum <- grep(rule$slash_with_two_nums, col, ignore.case = TRUE)
-    eitherMth <- grep(rule$slash_day_and_mth, col, ignore.case = TRUE)
-    single_day_f <- grep(rule$single_day_first, col, ignore.case = TRUE)
-    single_mth_f <- grep(rule$single_mth_first, col, ignore.case = TRUE)
-    numeral <- grep(rule$date_numeral, col, ignore.case = TRUE)
+## Constructs S3 objects of class 'excelFile', which contain 
+## properties associated with .xls/.xlsx files
+excelFile <- function(file) {
+    require(readxl)
     
-    if (anyDuplicated(c(twoNum, eitherMth, single, numeral)))
-        stop("There was a pattern-matching conflict for the date columns.")
+    ## Identify individual spreadsheets
+    sheetNames <-  excel_sheets(file)
+    sheetList <- lapply(sheetNames, function(sht) {
+        read_excel(path = file,
+                   sheet = sht,
+                   col_types = "text")
+    })
     
+    prop <- file.info(file)
+    exf <- structure(
+        list(
+            fileName = file,
+            fileSize = prop$size,
+            created = prop$ctime,
+            modified = prop$mtime,
+            noOfSheets = length(sheetNames),
+            sheets = sheetNames,
+            data = sheetList
+        ),
+        class = "excelFile"
+    )
+    # TODO: Apply some limits.
+}
+
+
+
+
+
+## S3 method to output information on the object
+print.excelFile <- function(xlObj) {
+    cat(sprintf(
+        ngettext(
+            xlObj$noOfSheets,
+            "Filename: %s with %s spreadsheet.\n",
+            "Filename: %s with %s spreadsheets.\n"
+        ),
+        xlObj$fileName,
+        xlObj$noOfSheets
+    ))
+    cat("Data: \n")
+    print(xlObj$data)
+}
+
+
+
+
+
+
+
+## S3 method to provide a summary of the object
+summary.excelFile <- function(xlobj) {
+    cat(paste0(
+        "File: ",
+        sQuote(xlObj$fileName),
+        ". Size:",
+        xlObj$fileSize,
+        "B\n"
+    ))
+    cat("Spreadsheet(s):\n")
+    for (i in 1:xlObj$noOfSheets) {
+        cat(paste0(i, ". ", sQuote(xlObj$sheets), "\n"))
+    }
+}
+
+
+
+
+
+
+
+
+
+## S3 Object for regular expressions
+##  It establishes the patterns for entries that have:
+##   => two numbers separated by a forward slash e.g. 10/6
+##   => two day-month combos separated by a fwd slash e.g. May 6/June 12
+##   => a "DD Month" e.g. 15 Oct
+##   => an Excel date numeral e.g. "43322" equiv. to 12 Aug 2018
+##   => entries that have three date fields e.g. 13/03/2001, 13th March 2001
+regexPatterns <- function() {
+    day_first <- "([0-3]*[0-9])(\\s+)([[:alpha:]]{3,})"
+    mth_first <- "([[:alpha:]]{3,})(\\s+)([0-3]*[0-9])"
+    beg <- "^"
+    end <- "$"
+    slash <- "(\\s*/\\s*)"
     structure(
         list(
-            twoNum = twoNum,
-            eitherMth = eitherMth,
-            single_day_f = single_day_f,
-            single_mth_f = single_mth_f,
-            numeral = numeral,
-            class = "regexIndices"
-        )
+            date_numeral = "^[1-9][0-9]{4}$",
+            num_slash_num = 
+                paste0(beg, "([0-3]*[0-9])", slash, "([0-3][0-9])", end),
+            single_day_first = paste0(beg, day_first, end),
+            single_mth_first = paste0(beg, mth_first, end),
+            double_day_first =
+                paste0(beg, day_first, slash, day_first, end),
+            double_mth_first =
+                paste0(beg, mth_first, slash, mth_first, end)
+        ),
+        class = "regexPatterns"
     )
 }
 
 
-####################################################################
-##  Definitions of custom functions created for 'narc-dfmerge.R'  ##
-####################################################################
+
+
+
+
+
+
+
+
+
+
+## S3 object for determinating which indices match any of the patterns
+## in the 'regexPattern' object, within a particular date-related column
+## @note Objects of this class must not be created until all pure 'numerical'
+## date entries have been converted to character DD-MM or MM-DD values.
+regexIndices <- function(rules, col) {
+    ls <- lapply(rules, function(x) grep(x, col, ignore.case = TRUE))
+    
+    allIndices <- c(ls$numeral,
+                    ls$twoNum,
+                    ls$single_day_f,
+                    ls$single_mth_f,
+                    ls$double_day_f,
+                    ls$double_mth_f)
+    
+    if (anyDuplicated(allIndices)) {
+        dups <- duplicated(allIndices)
+        stop(
+            "A pattern-matching conflict occurred, with duplications at pos ",
+             sQuote(which(dups))
+            )
+    }
+    
+    if (any(grepl("^\\d+$", col)))
+        stop("Numbers-only values must be converted
+             before creating objects of this class.")
+    
+    attr(ls, "class") <-  "regexIndices"
+    invisible(ls)
+}
+
+###################################################################
+##         Custom functions created for 'narc-dfmerge.R'         ##
+###################################################################
 
 
 ## Loads the packages needed to work with the project, and where any is
@@ -166,7 +191,9 @@ load_packages <- function(pkgs) {
     if (length(missingPkgs)) {
         install.packages(as.character(missingPkgs),
                          repos = "https://cran.rstudio.com")
-        suppressPackageStartupMessages(lapply(missingPkgs, library, character.only = TRUE))
+        suppressPackageStartupMessages(
+            lapply(missingPkgs, library, character.only = TRUE)
+            )
     }
     
     if (any(!pkgs %in% (.packages())))
@@ -217,6 +244,23 @@ find_excel_files <- function(path = ".") {
 
 
 
+## Extracts spreadsheets from an excelFile object.
+## Note that this function cannot retrieve spreadsheets
+## directly from an unprocessed .xls/.xlsx file
+extract_spreadsheets <- function(fileObj) {
+    if (inherits(fileObj, "excelFile")) {
+        lapply(fileObj$data, function(dat) return(dat))
+    }
+    else {
+        stop("'fileObj' is not an 'excelFile' object.")
+    }
+}
+
+
+
+
+
+
 
 
 
@@ -258,6 +302,7 @@ locate_header <- function(df, hdr, quietly = TRUE) {
     }
     invisible(val)
 }
+
 
 
 
@@ -429,21 +474,11 @@ set_datatypes <- function(df) {
 
 
 
-fix_funny_date_entries <- function(df) {
-    
-    ## Temporary data frame based on the new columns
-    focusCol <-
-        c("bday.day", "bday.mth", "wedann.day", "wedann.mth")
-    
-    tmpDf <- "" %>%
-        matrix(nrow = nrow(df), ncol = length(focusCol)) %>%
-        as_tibble()
-    
-    colnames(tmpDf) <- focusCol
-    
-    ## Identify the columns in the original data frame
+## Corrects the various kinds of date entries found in the dataset by
+## creating new columns that contain only day and month values
+fix_date_entries <- function(df) {
+    ## Identify by name columns in the original data frame
     ## that are likely to contain the awkard entries
-    fields <- colnames(df)
     awkward <- c(
         "BDAY/WED ANN",
         "BIRTHDAY AND WEDDING ANN",
@@ -453,19 +488,83 @@ fix_funny_date_entries <- function(df) {
         "BIRTHDAY AND WED ANN"
     )
     
-    ## Processing for the columns of interest
-    if (any(awkward %in% fields)) {
-        indexAwkward <- match(awkward, fields) %>%
-            na.exclude() %>%
-            sort()
+    fields <- colnames(df)
+    
+    indexAwk <- match(awkward, fields) %>%
+        na.exclude() %>%
+        sort()
+    
+    if (length(indexAwk)) {
+        awkColHdr <- fields[indexAwk]
+        tempdf <- .process_date_entries(df, awkColHdr)
+        df <- bind_cols(df, tempdf)
         
-        tmpDf <-  .process_awkward_cols(df, tmpDf, indexAwkward)
+        df <- df[, -indexAwk]
+    }
+    df
+}
+
+
+
+
+
+
+
+
+
+
+## Moves down a column with date entries to carry out
+## necessary processing. Principally these 3 actions take place:
+## 1. Cleaning up of entries
+## 2. Conversion of 'pure' numbers to day/month (in words)
+## 3. Assignment of day and month values to new distinct columns
+## 4. Changing of all abbreviated month names to full version
+## @return a four-column data frame with days and months of
+## birthdays and wedding anniversaries, respectively
+.process_date_entries <- function(df, columnNames) {
+    stopifnot(is.character(columnNames)) # TODO: Rather pattern compatibility?
+    newColHdr <- c("bday.day", "bday.mth", "wedann.day", "wedann.mth")
+    temp.df <-
+        data.frame(
+            matrix("", nrow = nrow(df), ncol = length(newColHdr)),
+            stringsAsFactors = FALSE)
+    lapply(columnNames, function(name) {
+        column <- df[[name]] %>%
+            .cleanup_date_entries()
         
-        df <- bind_cols(df, tmpDf)
-        df <- df[, -indexAwkward]
+        column <- sapply(column, .convert_num_date_to_char, USE.NAMES = FALSE)
+
+        temp.df <<- .distribute_date_vals(temp.df, column)
+    })
+    colnames(temp.df) <- newColHdr
+    temp.df <- .change_to_full_mth_names(temp.df)
+}
+
+
+
+
+
+
+
+
+
+
+## Converts entries that consist of two numbers separated by a forward
+## slash into a leading numeral for days and fully spelt out month
+.convert_dbl_digit_to_char <- function(entry, thisPat) {
+    if (grepl(thisPat, entry)) {
+        mnthString <-
+            entry %>%
+            gsub(thisPat, "\\3", .) %>%
+            str_trim() %>%
+            as.numeric() %>%
+            month.name[.]
+    }
+    else {
+        return(entry)
     }
     
-    invisible(df)
+    updatedStr <- paste(str_trim(gsub(thisPat, "\\1", entry)), mnthString)
 }
 
 
@@ -477,212 +576,17 @@ fix_funny_date_entries <- function(df) {
 
 
 
-.process_awkward_cols <- function(main.df, temp.df, awkColIndex) {
-    ## Loop through the target columns in the data frame
-    for (topIndex in awkColIndex) {
-        nameCurrCol <- colnames(main.df)[topIndex]
-        main.df[[topIndex]] <-
-            sapply(main.df[[topIndex]], .preprocess_date_entry)
-        
-        ## Instantiate an object of class regexIndices
-        index <-
-            regexIndices(regexPatterns, main.df[[topIndex]])
-        
-        ## We start with conditional branches to be followed depending on
-        ## whether a columns starts with a 'B' or a 'W'.
-        if (grepl("^B[[:graph:]]+", nameCurrCol)) {
-            ## Note that at the beginning we do not use a loop. This is
-            ## because we can conveniently vectorize without losing data.
-            temp.df$bday.day[index$twoNum] <-
-                main.df[[topIndex]][index$twoNum]
-            temp.df$bday.day <- temp.df$bday.day %>%
-                str_replace(regexPatterns$slash_with_two_nums, "\\1") %>%
-                str_trim()
-            
-            temp.df$bday.mth[index$twoNum] <-
-                main.df[[topIndex]][index$twoNum]
-            temp.df$bday.mth <-
-                sapply(temp.df$bday.mth, function(x) {
-                    str_replace(x, regexPatterns$slash_with_two_nums, "\\3") %>%
-                        str_trim()
-                }) %>%
-                as.numeric() %>%
-                month.name[.]
-            
-            ## Now we loop...
-            for (a_single in index$single_day_f) {
-                # if (grepl("^[[:digit:]]", main.df[[topIndex]][a_single])) {
-                temp.df$bday.day[a_single] <-
-                    .distr_date_elems(main.df,
-                                      topIndex,
-                                      a_single,
-                                      regexPatterns$single_day_first,
-                                      "\\1")
-                
-                temp.df$bday.mth[a_single] <-
-                    .distr_date_elems(main.df,
-                                      topIndex,
-                                      a_single,
-                                      regexPatterns$single_day_first,
-                                      "\\3")
-            }
-            # } else if (grepl("^[[:alpha:]]", main.df[[topIndex]][a_single])) {
-            for (a_single in index$single_mth_f) {
-                temp.df$bday.day[a_single] <-
-                    .distr_date_elems(main.df,
-                                      topIndex,
-                                      a_single,
-                                      regexPatterns$single_mth_first,
-                                      "\\3")
-                
-                temp.df$bday.mth[a_single] <-
-                    .distr_date_elems(main.df,
-                                      topIndex,
-                                      a_single,
-                                      regexPatterns$single_mth_first,
-                                      "\\1")
-            }
-            
-            for (dateIndex in index$numeral) {
-                ## Numerical date values
-                dateNumToChar <-
-                    .convert_num_date_to_char(main.df[[topIndex]][dateIndex])
-                
-                temp.df$bday.day[dateIndex] <-
-                    dateNumToChar %>%
-                    str_replace(regexPatterns$single_day_first, "\\1") %>%
-                    str_trim()
-                
-                temp.df$bday.mth[dateIndex] <-
-                    dateNumToChar %>%
-                    str_replace(regexPatterns$single_day_first, "\\3") %>%
-                    str_trim()
-            }
-        } else if (grepl("^W[[:graph:]]+", nameCurrCol)) {
-            temp.df$wedann.day[index$twoNum] <-
-                main.df[[topIndex]][index$twoNum]
-            temp.df$wedann.day <- temp.df$wedann.day %>%
-                str_replace(regexPatterns$slash_with_two_nums, "\\1") %>%
-                str_trim()
-            
-            temp.df$wedann.mth[index$twoNum] <-
-                main.df[[topIndex]][index$twoNum]
-            temp.df$wedann.mth <-
-                sapply(temp.df$wedann.mth, function(x) {
-                    str_replace(x, regexPatterns$slash_with_two_nums, "\\3") %>%
-                        str_trim()
-                }) %>%
-                as.numeric() %>%
-                month.name[.]
-            
-            ## Now we loop...
-            for (a_single in index$single_day_f) {
-                temp.df$wedann.day[a_single] <-
-                    .distr_date_elems(main.df,
-                                      topIndex,
-                                      a_single,
-                                      regexPatterns$single_day_first,
-                                      "\\1")
-                
-                temp.df$wedann.mth[a_single] <-
-                    .distr_date_elems(main.df,
-                                      topIndex,
-                                      a_single,
-                                      regexPatterns$single_day_first,
-                                      "\\3")
-            }
-            for (a_single in index$single_mth_f) {
-                temp.df$wedann.day[a_single] <-
-                    .distr_date_elems(main.df,
-                                      topIndex,
-                                      a_single,
-                                      regexPatterns$single_mth_first,
-                                      "\\3")
-                
-                temp.df$wedann.mth[a_single] <-
-                    .distr_date_elems(main.df,
-                                      topIndex,
-                                      a_single,
-                                      regexPatterns$single_mth_first,
-                                      "\\1")
-            }
-            
-            ## Numerical date values
-            for (dateIndex in index$numeral) {
-                ## Reformat into a Date string with Day and Month
-                dateNumToChar <-
-                    .convert_num_date_to_char(main.df[[topIndex]][dateIndex])
-                
-                temp.df$wedann.day[dateIndex] <-
-                    dateNumToChar %>%
-                    str_replace(regexPatterns$single_day_first, "\\1") %>%
-                    str_trim()
-                
-                temp.df$wedann.mth[dateIndex] <-
-                    dateNumToChar %>%
-                    str_replace(regexPatterns$single_day_first, "\\3") %>%
-                    str_trim()
-            }
-        }  # end of block conditioning on whether name starts with B or W
-        
-        
-        ## Here there are two date entries per cell so we distribute
-        ## string fragments to the appropriate cell in 'temp.df'
-        for (an_eitherMth in index$eitherMth) {
-            temp.df$bday.day[an_eitherMth] <-
-                .distr_date_elems(
-                    main.df,
-                    topIndex,
-                    an_eitherMth,
-                    regexPatterns$slash_day_and_mth,
-                    "\\1",
-                    "[[:alpha:]]+"
-                )
-            
-            temp.df$bday.mth[an_eitherMth] <-
-                .distr_date_elems(
-                    main.df,
-                    topIndex,
-                    an_eitherMth,
-                    regexPatterns$slash_day_and_mth,
-                    "\\1",
-                    "[[:digit:]]+"
-                )
-            
-            temp.df$wedann.day[an_eitherMth] <-
-                .distr_date_elems(
-                    main.df,
-                    topIndex,
-                    an_eitherMth,
-                    regexPatterns$slash_day_and_mth,
-                    "\\3",
-                    "[[:alpha:]]+"
-                )
-            
-            
-            temp.df$wedann.mth[an_eitherMth] <-
-                .distr_date_elems(
-                    main.df,
-                    topIndex,
-                    an_eitherMth,
-                    regexPatterns$slash_day_and_mth,
-                    "\\1",
-                    "[[:digit:]]+"
-                )
-        }
-        
-    }  # end of outermost loop
-    
-    ## Correct abbreviated month entries to full month names
-    ## TODO: Encapsulate these statements within the function as well
-    indexMonthColumns <-
-        which(endsWith(colnames(temp.df), "mth"))
-    for (col in indexMonthColumns) {
-        months <- unlist(temp.df[, col])
-        temp.df[, col] <- .fix_mth_entries(months)
+
+
+## Takes all abbreviated momth names and changes them to the full thing
+.change_to_full_mth_names <- function(tempDF) {
+    monthColumns <- which(endsWith(colnames(tempDF), "mth"))
+    for (col in monthColumns) {
+        months <- unlist(tempDF[, col])
+        tempDF[, col] <- .fix_mth_entries(months)
     }
-    temp.df
-}
+    invisible(tempDF)
+}    
 
 
 
@@ -692,55 +596,18 @@ fix_funny_date_entries <- function(df) {
 
 
 
-
-## Picks out irregular entries, breaking them into bits. Numerals
-## (for days) and words (for months) are sent to appropriate columns.
-.distr_date_elems <- function(mainData,
-                              mainLoop,
-                              innerLoop,
-                              pattern,
-                              replacement,
-                              drop = "") {
-    mainData[[mainLoop]][innerLoop] %>%
-        str_replace(pattern, replacement) %>%
-        gsub(drop, "", .) %>%
-        str_trim()
-}
-
-
-
-
-
-## Works on the Excel 'Date' numeric values
-## Note that we have set aside a correction of 2:
-## - one for the origin, which Excel includes unlike
-##   the POSIX standard that we are using in R, and
-## - the 1900 that EXcel erroneously identifies as a leap year.
-.convert_num_date_to_char <- function(number) {
-    if (is.character(number))
-        number <- as.numeric(number)
-    ## TODO: Add condition for case where full date is counted
-    ## and the year is not the present year (use min reasonable value)
-    ## 2. Also do not accept dates that are in the future
-    
-    correction <- 2L
-    dateString <-
-        format(as.Date(number - correction, origin = "1900-01-01"), "%d %B")
-}
-
-
-
-
-
-
-
-## Removes characters that are not required in the date entries
-## Get rid of ordinal qualifiers, and then remove dots,
-## commas and hyphens from all entries, and trim whitespace
-.preprocess_date_entry <- function(entry) {
-    entry %>%
-        str_replace("(^\\s*[[:digit:]]{1,2}\\s+[[:alpha:]]+)/[[:alpha:]]+\\s*$",
-                    replacement = "\\1") %>%
+## Removes characters that are not required for date entries
+## - 'months' that have no 'day' specified,
+## - 'year' entries,
+## - ordinal qualifiers, 
+## - dots, commas and hyphens, and
+## - whitespace
+.cleanup_date_entries <- function(entries) {
+    entries %>%
+        str_replace(
+            "(^\\s*[[:digit:]]{1,2}\\s+[[:alpha:]]+)/[[:alpha:]]+\\s*$",
+                    replacement = "\\1"
+            ) %>%
         str_replace(
             "^\\s*[[:alpha:]]{3,}/[[:alpha:]]{3,}\\s*[[:digit:]]{1,2}\\s*$",
             replacement = ""
@@ -752,6 +619,117 @@ fix_funny_date_entries <- function(df) {
         str_trim()
 }
 
+
+
+
+
+
+
+
+## Works on the Excel 'Date' numeric values
+## Note that we have set aside a correction of 2:
+## - one for the origin, which Excel includes unlike
+##   the POSIX standard that we are using in R, and
+## - the 1900 that EXcel erroneously identifies as a leap year.
+.convert_num_date_to_char <- function(str) {
+    number <- suppressWarnings(as.numeric(str))
+    
+    if (is.na(number)) return(str)
+    
+    # TODO:
+    ## 1. Add condition for case where full date is counted
+    ## and the year is not the present year (use min reasonable value)
+    ## 2. Also do not accept dates that are in the future
+
+    correct <- 2L
+    invisible(
+        format(as.Date(number - correct, origin = "1900-01-01"), "%d %B")
+        )
+}
+
+
+
+
+
+
+
+
+
+## Apportions a component of an entered date to an appropriate new column
+.distribute_date_vals <- function(tempDF, column) {
+    stopifnot(identical(nrow(tempDF), length(column)))
+    rules <- regexPatterns()  # object with patterns
+    
+    ## Before setting the indices for the patterns, we have to convert
+    ## those entries with the numerical (D)D/MM format character-based
+    ## month values e.g. 13 June
+    column <- sapply(X = column,
+                     FUN = .convert_dbl_digit_to_char, rules$num_slash_num,
+                     USE.NAMES = FALSE)
+    indices <- regexIndices(rules, column) # object with indices
+    
+    for (i in 1:ncol(tempDF)) {
+        if (any(grepl(rules$single_day_first, column))) {
+            beacon <- c("\\1", "\\3", "", "")
+            ind <- indices$single_day_first
+            vals <- .extract_date_values(column,
+                                         rules$single_day_first,
+                                         ind,
+                                         beacon[i])
+            tempDF[[i]] <- replace(tempDF[[i]], ind, vals)
+        }
+        if (any(grepl(rules$single_mth_first, column))) {
+            beacon <- c("\\3", "\\1", "", "")
+            ind <- indices$single_mth_first
+            vals <- .extract_date_values(column,
+                                         rules$single_mth_first,
+                                         ind,
+                                         beacon[i])
+            tempDF[[i]] <- replace(tempDF[[i]], ind, vals)
+        }
+        if (any(grepl(rules$double_day_first, column))) {
+            beacon <- c("\\1", "\\3", "\\5", "\\7")
+            ind <- indices$double_day_first
+            vals <- .extract_date_values(column,
+                                         rules$double_day_first,
+                                         ind,
+                                         beacon[i])
+            tempDF[[i]] <- replace(tempDF[[i]], ind, vals)
+        }
+        if (any(grepl(rules$double_mth_first, column))) {
+            beacon <- c("\\3", "\\1", "\\7", "\\5")
+            ind <- indices$double_mth_first
+            vals <- .extract_date_values(column,
+                                         rules$double_mth_first,
+                                         ind,
+                                         beacon[i])
+            tempDF[[i]] <- replace(tempDF[[i]], ind, vals)
+        }
+    }
+    invisible(tempDF)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+## Extracts day and month as the case may be.
+## @param rules a regular expression
+## @param beacon a backreference used for substition of grouped patterns
+## @details whitespace trimming is also carried out
+.extract_date_values <- function(column, rules, index, beacon) {
+    column <- column[index] %>%
+        gsub(rules, beacon, .) %>%
+        str_trim()
+}
+   
 
 
 
@@ -790,7 +768,15 @@ fix_funny_date_entries <- function(df) {
 
 
 
+
+
+
+
+
+
+
+## Prints signpost
 notice <- function() {
-    cat("Copyright (c) Dev Solutions 2018. All rights reserved.\n")
+    cat("Copyright (c) DevSolutions 2018. All rights reserved.\n")
     cat("  NOTICE: This software is provided without any warranty.\n\n")
 }
