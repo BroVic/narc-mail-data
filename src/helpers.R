@@ -119,7 +119,7 @@ regexPatterns <- function() {
         list(
             date_numeral = "^[1-9][0-9]{4}$",
             num_slash_num = 
-                paste0(beg, "([0-3][0-9])", slash, "([0-3][0-9])", end),
+                paste0(beg, "([0-3]*[0-9])", slash, "([0-3][0-9])", end),
             single_day_first = paste0(beg, day_first, end),
             single_mth_first = paste0(beg, mth_first, end),
             double_day_first =
@@ -534,7 +534,8 @@ fix_date_entries <- function(df) {
         column <- df[[name]] %>%
             .cleanup_date_entries()
         
-        column <- sapply(column, .convert_num_date_to_char)
+        column <- sapply(column, .convert_num_date_to_char, USE.NAMES = FALSE)
+
         temp.df <<- .distribute_date_vals(temp.df, column)
     })
     colnames(temp.df) <- newColHdr
@@ -633,9 +634,7 @@ fix_date_entries <- function(df) {
 ##   the POSIX standard that we are using in R, and
 ## - the 1900 that EXcel erroneously identifies as a leap year.
 .convert_num_date_to_char <- function(str) {
-    number <- str %>%
-        as.numeric() %>%
-        suppressWarnings()
+    number <- suppressWarnings(as.numeric(str))
     
     if (is.na(number)) return(str)
     
@@ -663,11 +662,13 @@ fix_date_entries <- function(df) {
     stopifnot(identical(nrow(tempDF), length(column)))
     rules <- regexPatterns()  # object with patterns
     
-    column <- sapply(column, function(x)
-        .convert_dbl_digit_to_char(x, rules$num_slash_num))
+    ## Before setting the indices for the patterns, we have to convert
+    ## those entries with the numerical (D)D/MM format character-based
+    ## month values e.g. 13 June
+    column <- sapply(X = column,
+                     FUN = .convert_dbl_digit_to_char, rules$num_slash_num,
+                     USE.NAMES = FALSE)
     indices <- regexIndices(rules, column) # object with indices
-    
-    
     
     for (i in 1:ncol(tempDF)) {
         if (any(grepl(rules$single_day_first, column))) {
@@ -699,7 +700,7 @@ fix_date_entries <- function(df) {
         }
         if (any(grepl(rules$double_mth_first, column))) {
             beacon <- c("\\3", "\\1", "\\7", "\\5")
-            ind <- rules$double_mth_first
+            ind <- indices$double_mth_first
             vals <- .extract_date_values(column,
                                          rules$double_mth_first,
                                          ind,
