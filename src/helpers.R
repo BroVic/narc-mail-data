@@ -424,21 +424,35 @@ combine_dfs <- function(dfs) {
 
 ## Sets the columns to the appropriate data types
 set_datatypes <- function(df) {
-    df$serialno <- seq_along(df$serialno)
+    stopifnot(inherits(df, "data.frame"))
+    colm <- colnames(df)
+    chars <- colm[c(2:5)]
+    cats <- colm[c(7, 9:13)]
+    nums <- colm[c(1, 6, 8)]
     
-    df$phone <- .fix_phone_numbers(df$phone)
-    
-    ## TODO: Undo hard coding
-    for (i in c(2, 4:5))
-        df[[i]] <- as.character(df[[i]])
-    
-    for (i in c(7, 9:13))
-        df[[i]] <- as.factor(df[[i]])
-    
-    for (i in c(6, 8))
-        df[[i]] <- as.integer(df[[i]])
-    
-    invisible(df)
+    lapply(colm, function(var) {
+        if (var %in% chars) {
+            if (identical(var, "phone"))
+                df[[var]]  <- .fix_phone_numbers(df[[var]])
+            df[[var]] <- as.character(df[[var]])
+        }
+        else if (var %in% cats) {
+            if (endsWith(var, "mth"))
+                df[[var]] <-
+                    factor(df[[var]], levels = month.name, ordered = TRUE)
+            else
+                df[[var]]  <- as.factor(df[[var]])
+        }
+        else if (var %in% nums) {
+            if (identical(var, "serialno"))
+                df[[var]]  <- seq_len(nrow(df))
+            df[[var]]  <- as.integer(df[[var]])
+        }
+        else warning(sprintf(
+            "The data type of the '%s' variable could not be set.", var
+        ))
+    }) %>%
+        as.data.frame(col.names = colm, stringsAsFactors = FALSE)
 }
 
 
