@@ -151,10 +151,10 @@ regexIndices <- function(rules, col) {
     
     allIndices <- c(ls$numeral,
                     ls$twoNum,
-                    ls$single_day_f,
-                    ls$single_mth_f,
-                    ls$double_day_f,
-                    ls$double_mth_f)
+                    ls$single_day_first,
+                    ls$single_mth_first,
+                    ls$double_day_first,
+                    ls$double_mth_first)
     
     if (anyDuplicated(allIndices)) {
         dups <- duplicated(allIndices)
@@ -676,49 +676,28 @@ fix_date_entries <- function(df) {
     
     ## Before setting the indices for the patterns, we have to convert
     ## those entries with the numerical (D)D/MM format character-based
-    ## month values e.g. 13 June
+    ## month values e.g. from 13/06 to 13 June
     column <- sapply(X = column,
                      FUN = .convert_dbl_digit_to_char, rules$num_slash_num,
                      USE.NAMES = FALSE)
     indices <- regexIndices(rules, column) # object with indices
     
+    repl_vals <- function(rule, index, backref) {
+        if (any(grepl(rule, column))) {
+            vals <- .extract_date_values(column, rule, index, backref)
+            tempDF[[i]] <<- replace(tempDF[[i]], index, vals)
+        }
+    }
+    
     for (i in 1:ncol(tempDF)) {
-        if (any(grepl(rules$single_day_first, column))) {
-            beacon <- c("\\1", "\\3", "", "")
-            ind <- indices$single_day_first
-            vals <- .extract_date_values(column,
-                                         rules$single_day_first,
-                                         ind,
-                                         beacon[i])
-            tempDF[[i]] <- replace(tempDF[[i]], ind, vals)
-        }
-        if (any(grepl(rules$single_mth_first, column))) {
-            beacon <- c("\\3", "\\1", "", "")
-            ind <- indices$single_mth_first
-            vals <- .extract_date_values(column,
-                                         rules$single_mth_first,
-                                         ind,
-                                         beacon[i])
-            tempDF[[i]] <- replace(tempDF[[i]], ind, vals)
-        }
-        if (any(grepl(rules$double_day_first, column))) {
-            beacon <- c("\\1", "\\3", "\\5", "\\7")
-            ind <- indices$double_day_first
-            vals <- .extract_date_values(column,
-                                         rules$double_day_first,
-                                         ind,
-                                         beacon[i])
-            tempDF[[i]] <- replace(tempDF[[i]], ind, vals)
-        }
-        if (any(grepl(rules$double_mth_first, column))) {
-            beacon <- c("\\3", "\\1", "\\7", "\\5")
-            ind <- indices$double_mth_first
-            vals <- .extract_date_values(column,
-                                         rules$double_mth_first,
-                                         ind,
-                                         beacon[i])
-            tempDF[[i]] <- replace(tempDF[[i]], ind, vals)
-        }
+        beacon <- c("\\1", "\\3", "", "")
+        repl_vals(rules$single_day_first, indices$single_day_first, beacon[i])
+        beacon <- c("\\3", "\\1", "", "")
+        repl_vals(rules$single_mth_first, indices$single_mth_first, beacon[i])
+        beacon <- c("\\1", "\\3", "\\5", "\\7")
+        repl_vals(rules$double_day_first, indices$double_day_first, beacon[i])
+        beacon <- c("\\3", "\\1", "\\7", "\\5")
+        repl_vals(rules$double_mth_first, indices$double_mth_first, beacon[i])
     }
     invisible(tempDF)
 }
