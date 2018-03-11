@@ -109,15 +109,18 @@ if (!dbIsValid(con))
 dbTable <- "NARC_mail"
 dbWriteTable(conn = con, dbTable, master, append = TRUE)
 
-## Deal with wholesale replications
+## Deal with wholesale replications and empty records
 master <- dbReadTable(con, dbTable) %>%
-    distinct() %>%
-    dbWriteTable(con, dbTable, ., overwrite = TRUE)
+    distinct()
+all_empty <- apply(master, 1, function(x) all(is.na(x)))
+master <- master[!all_empty, ]
+master$serialno <- seq_along(length(master$serialno))
+dbWriteTable(con, dbTable, master, overwrite = TRUE)
 
 ## Close shop...
 dbDisconnect(con)
 if (dbIsValid(con)) {
-    warning("The database is not properly disconnected from the R session.")
+    warning("The database connection was not properly closed.")
 } else {
     rm(con)
     cat("Done\n")
