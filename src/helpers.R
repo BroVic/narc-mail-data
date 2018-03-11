@@ -209,7 +209,7 @@ load_packages <- function(pkgs) {
 
 ## Finds all existing Excel files within a given directory
 
-find_excel_files <- function(path = ".") {
+find_excel_files <- function(path = ".", quietly = FALSE) {
     # TODO: There are situations when a file's extension
     # may not be specified and thus there may be need to
     # test such files to know whether they are of the format.
@@ -221,22 +221,24 @@ find_excel_files <- function(path = ".") {
     if (!numFiles) {
         stop("There are no Excel files in this directory.")
     } else {
-        cat(sprintf(
-            ngettext(
+        if (!quietly) {
+            cat(sprintf(
+                ngettext(
+                    numFiles,
+                    "\t%d Excel file was found in %s:\n",
+                    "\t%d Excel files were found in %s:\n"
+                ),
                 numFiles,
-                "\t%d Excel file was found in %s:\n",
-                "\t%d Excel files were found in %s:\n"
-            ),
-            numFiles, sQuote(path.expand(path))
-        ))
-        
-        ## List the files
-        sapply(xlFiles, function(x) {
-            cat(sprintf("\t  * %s\n", basename(x)))
-        })
+                sQuote(path.expand(path))
+            ))
+            
+            ## List the files
+            sapply(xlFiles, function(x) {
+                cat(sprintf("\t  * %s\n", basename(x)))
+            })
+        }
     }
-    
-    invisible(xlFiles)
+    xlFiles
 }
 
 
