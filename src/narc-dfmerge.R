@@ -114,7 +114,7 @@ master <- dbReadTable(con, dbTable) %>%
     distinct()
 all_empty <- apply(master, 1, function(x) all(is.na(x)))
 master <- master[!all_empty, ]
-master$serialno <- seq_along(length(master$serialno))
+master$serialno <- seq_along(master$serialno)
 dbWriteTable(con, dbTable, master, overwrite = TRUE)
 
 ## Close shop...
