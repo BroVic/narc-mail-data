@@ -28,6 +28,7 @@ cat("Loading required packages... ")
 load_packages(pkgs = c("DBI",
                        "RSQLite",
                        "dplyr",
+                       "hellno",
                        "readxl",
                        "stringr"))
 cat("Done\n")
