@@ -80,11 +80,17 @@ test_that("Object class with regex patterns is properly instantiated", {
           NA,
           "May 5/Jun 12",
           "6/04")
-        attr(column, "name") <- "BDAY"
+    column <- hellno::as.data.frame(column)
+    names(column) <- "BDAY"
     pat <- regexPatterns()
+    
+    expect_error(regexIndices(pat, column), "Numbers-only values must be")
+    
+    column <- filter(column, BDAY != "43322")
     ind <- regexIndices(pat, column)
     
-    expect_error(regexIndices(pat, col), "Numbers-only values must be")
+    expect_s3_class(pat, "regexPatterns")
+    expect_s3_class(ind, "regexIndices")
 })
 
 
@@ -197,20 +203,4 @@ test_that("Unwanted characters/entries are removed entirely", {
     expect_equal(smpl[4], "Aug  6")
     expect_equal(smpl[5], "12/05")
     expect_equal(smpl[6], "31 Oct/6 July")  # unchanged
-})
-
-
-test_that("Values of date entries are properly allocated to columns", {
-    testPat <- regexPatterns()
-    
-    dM <- .distribute_vals("3 May", testPat$single_day_first)
-    mD <- .distribute_vals("May 3", testPat$single_mth_first)
-    
-    expect_type(dM, "list")
-    expect_type(mD, "list")
-    expect_type(.distribute_vals("43322", date_num), "list")
-    expect_equal(dM[[1]], "3")
-    expect_equal(dM[[2]], "May")
-    expect_equal(mD[[1]], "3")
-    expect_equal(mD[[2]], "May")
 })
