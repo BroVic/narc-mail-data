@@ -119,7 +119,7 @@ regexPatterns <- function() {
         list(
             date_numeral = "^[1-9][0-9]{4}$",
             num_slash_num = 
-                paste0(beg, "([0-3]*[0-9])", slash, "([0-3][0-9])", end),
+                paste0(beg, "([0-3]*[0-9])", slash, "([0-1]*[0-9])", end),
             single_day_first = paste0(beg, day_first, end),
             single_mth_first = paste0(beg, mth_first, end),
             double_day_first =
@@ -147,7 +147,9 @@ regexPatterns <- function() {
 ## @note Objects of this class must not be created until all pure 'numerical'
 ## date entries have been converted to character DD-MM or MM-DD values.
 regexIndices <- function(rules, col) {
-    ls <- lapply(rules, function(x) grep(x, col, ignore.case = TRUE))
+    if (!inherits(col, "data.frame"))
+        stop("Expected 'col' to be of class 'data.frame'")
+    ls <- lapply(rules, function(x) grep(x, unlist(col), ignore.case = TRUE))
     
     allIndices <- c(ls$numeral,
                     ls$twoNum,
@@ -164,7 +166,7 @@ regexIndices <- function(rules, col) {
             )
     }
     
-    if (any(grepl("^\\d+$", col)))
+    if (any(grepl("^\\d+$", unlist(col))))
         stop("Numbers-only values must be converted
              before creating objects of this class.")
     
@@ -537,20 +539,21 @@ fix_date_entries <- function(df) {
 ## 4. Changing of all abbreviated month names to full version
 ## @return a four-column data frame with days and months of
 ## birthdays and wedding anniversaries, respectively
-.process_date_entries <- function(df, columnNames) {
-    stopifnot(is.character(columnNames)) # TODO: Rather pattern compatibility?
+.process_date_entries <- function(df, awkardColNames) {
+    require(hellno)
+    stopifnot(is.character(awkardColNames)) # TODO: Rather pattern compatibility?
     newColHdr <- c("bday.day", "bday.mth", "wedann.day", "wedann.mth")
     temp.df <-
-        data.frame(
-            matrix("", nrow = nrow(df), ncol = length(newColHdr)),
-            stringsAsFactors = FALSE)
-    lapply(columnNames, function(name) {
-        column <- df[[name]] %>%
+        data.frame(matrix("", nrow = nrow(df), ncol = length(newColHdr)))
+    lapply(awkardColNames, function(name) {
+        dfColumn <- df[name] %>%
             .cleanup_date_entries()
-        
-        column <- sapply(column, .convert_num_date_to_char, USE.NAMES = FALSE)
 
-        temp.df <<- .distribute_date_vals(temp.df, column)
+        dfColumn <-
+            sapply(unlist(dfColumn), .convert_num_date_to_char, USE.NAMES = FALSE) %>%
+            as.data.frame()
+
+        temp.df <<- .distribute_date_vals(temp.df, dfColumn, name)
     })
     colnames(temp.df) <- newColHdr
     temp.df <- .change_to_full_mth_names(temp.df)
@@ -618,21 +621,24 @@ fix_date_entries <- function(df) {
 ## - ordinal qualifiers, 
 ## - dots, commas and hyphens, and
 ## - whitespace
-.cleanup_date_entries <- function(entries) {
-    entries %>%
-        str_replace(
-            "(^\\s*[[:digit:]]{1,2}\\s+[[:alpha:]]+)/[[:alpha:]]+\\s*$",
-                    replacement = "\\1"
+.cleanup_date_entries <- function(datesCol) {
+    require(hellno)
+    sapply(datesCol, function(cell) {
+        cell %>%
+            str_replace(
+                "(^\\s*[[:digit:]]{1,2}\\s+[[:alpha:]]+)/[[:alpha:]]+\\s*$",
+                replacement = "\\1"
             ) %>%
-        str_replace(
-            "^\\s*[[:alpha:]]{3,}/[[:alpha:]]{3,}\\s*[[:digit:]]{1,2}\\s*$",
-            replacement = ""
-        ) %>%
-        str_replace("(/|\\s)([[:alnum:]]{2,})(/|\\s)([[:digit:]]{4}$)",
-                    replacement = "\\1\\2") %>%
-        str_replace("nd|rd|st|th", replacement = "") %>%
-        str_replace_all("[,|.|-]", replacement = " ") %>%
-        str_trim()
+            str_replace(
+                "^\\s*[[:alpha:]]{3,}/[[:alpha:]]{3,}\\s*[[:digit:]]{1,2}\\s*$",
+                replacement = ""
+            ) %>%
+            str_replace("(/|\\s)([[:alnum:]]{2,})(/|\\s)([[:digit:]]{4}$)",
+                        replacement = "\\1\\2") %>%
+            str_replace("nd|rd|st|th", replacement = "") %>%
+            str_replace_all("[,|.|-]", replacement = " ") %>%
+            str_trim()
+    }) %>% as.data.frame()
 }
 
 
@@ -649,7 +655,6 @@ fix_date_entries <- function(df) {
 ## - the 1900 that EXcel erroneously identifies as a leap year.
 .convert_num_date_to_char <- function(str) {
     number <- suppressWarnings(as.numeric(str))
-    
     if (is.na(number)) return(str)
     
     # TODO:
@@ -672,34 +677,40 @@ fix_date_entries <- function(df) {
 
 
 ## Apportions a component of an entered date to an appropriate new column
-.distribute_date_vals <- function(tempDF, column) {
-    stopifnot(identical(nrow(tempDF), length(column)))
-    rules <- regexPatterns()  # object with patterns
-    
-    ## Before setting the indices for the patterns, we have to convert
-    ## those entries with the numerical (D)D/MM format character-based
-    ## month values e.g. from 13/06 to 13 June
-    column <- sapply(X = column,
-                     FUN = .convert_dbl_digit_to_char, rules$num_slash_num,
-                     USE.NAMES = FALSE)
-    indices <- regexIndices(rules, column) # object with indices
-    
+## Before setting the indices for the patterns, we have to convert
+## those entries with the numerical (D)D/MM format character-based
+## month values e.g. from 13/06 to 13 June
+.distribute_date_vals <- function(tempDF, column, col.name) {
+    require(hellno)
+    stopifnot(identical(nrow(tempDF), nrow(column)))
+    rules <- regexPatterns()
+    column <- sapply(unlist(column), function(x) {
+        .convert_dbl_digit_to_char(x, rules$num_slash_num)
+        }) %>% as.data.frame()
+    indices <- regexIndices(rules, column)
     repl_vals <- function(rule, index, backref) {
+        column <- unlist(column)
         if (any(grepl(rule, column))) {
             vals <- .extract_date_values(column, rule, index, backref)
             tempDF[[i]] <<- replace(tempDF[[i]], index, vals)
         }
     }
-    
     for (i in 1:ncol(tempDF)) {
-        beacon <- c("\\1", "\\3", "", "")
-        repl_vals(rules$single_day_first, indices$single_day_first, beacon[i])
-        beacon <- c("\\3", "\\1", "", "")
-        repl_vals(rules$single_mth_first, indices$single_mth_first, beacon[i])
+        if (startsWith(col.name, "B") & (i < 3L) |
+            startsWith(col.name, "W") & (i > 2L)) {
+            beacon <- rep(c("\\1", "\\3"), 2)
+            repl_vals(rules$single_day_first, indices$single_day_first,
+                      beacon[i])
+            beacon <- rep(c("\\3", "\\1"), 2)
+            repl_vals(rules$single_mth_first, indices$single_mth_first,
+                      beacon[i])
+        }
         beacon <- c("\\1", "\\3", "\\5", "\\7")
-        repl_vals(rules$double_day_first, indices$double_day_first, beacon[i])
+        repl_vals(rules$double_day_first, indices$double_day_first,
+                  beacon[i])
         beacon <- c("\\3", "\\1", "\\7", "\\5")
-        repl_vals(rules$double_mth_first, indices$double_mth_first, beacon[i])
+        repl_vals(rules$double_mth_first, indices$double_mth_first,
+                  beacon[i])
     }
     invisible(tempDF)
 }
@@ -720,7 +731,7 @@ fix_date_entries <- function(df) {
 ## @param beacon a backreference used for substition of grouped patterns
 ## @details whitespace trimming is also carried out
 .extract_date_values <- function(column, rules, index, beacon) {
-    column <- column[index] %>%
+    column[index] %>%
         gsub(rules, beacon, .) %>%
         str_trim()
 }
