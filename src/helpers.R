@@ -110,8 +110,8 @@ summary.excelFile <- function(xlobj) {
 ##   => an Excel date numeral e.g. "43322" equiv. to 12 Aug 2018
 ##   => entries that have three date fields e.g. 13/03/2001, 13th March 2001
 regexPatterns <- function() {
-    day_first <- "([0-3]*[0-9])(\\s+)([[:alpha:]]{3,})"
-    mth_first <- "([[:alpha:]]{3,})(\\s+)([0-3]*[0-9])"
+    dd_mm <- "([0-3]*[0-9])(\\s+)([[:alpha:]]{3,})"
+    mm_dd <- "([[:alpha:]]{3,})(\\s+)([0-3]*[0-9])"
     beg <- "^"
     end <- "$"
     slash <- "(\\s*/\\s*)"
@@ -120,12 +120,12 @@ regexPatterns <- function() {
             date_numeral = "^[1-9][0-9]{4}$",
             num_slash_num = 
                 paste0(beg, "([0-3]*[0-9])", slash, "([0-1]*[0-9])", end),
-            single_day_first = paste0(beg, day_first, end),
-            single_mth_first = paste0(beg, mth_first, end),
-            double_day_first =
-                paste0(beg, day_first, slash, day_first, end),
-            double_mth_first =
-                paste0(beg, mth_first, slash, mth_first, end)
+            sng_dd_mm = paste0(beg, dd_mm, end),
+            sng_mm_dd = paste0(beg, mm_dd, end),
+            dbl_dd_mm =
+                paste0(beg, dd_mm, slash, dd_mm, end),
+            dbl_mm_dd =
+                paste0(beg, mm_dd, slash, mm_dd, end)
         ),
         class = "regexPatterns"
     )
@@ -153,10 +153,10 @@ regexIndices <- function(rules, col) {
     
     allIndices <- c(ls$numeral,
                     ls$twoNum,
-                    ls$single_day_first,
-                    ls$single_mth_first,
-                    ls$double_day_first,
-                    ls$double_mth_first)
+                    ls$sng_dd_mm,
+                    ls$sng_mm_dd,
+                    ls$dbl_dd_mm,
+                    ls$dbl_mm_dd)
     
     if (anyDuplicated(allIndices)) {
         dups <- duplicated(allIndices)
@@ -699,18 +699,14 @@ fix_date_entries <- function(df) {
         if (startsWith(col.name, "B") & (i < 3L) |
             startsWith(col.name, "W") & (i > 2L)) {
             beacon <- rep(c("\\1", "\\3"), 2)
-            repl_vals(rules$single_day_first, indices$single_day_first,
-                      beacon[i])
+            repl_vals(rules$sng_dd_mm, indices$sng_dd_mm, beacon[i])
             beacon <- rep(c("\\3", "\\1"), 2)
-            repl_vals(rules$single_mth_first, indices$single_mth_first,
-                      beacon[i])
+            repl_vals(rules$sng_mm_dd, indices$sng_mm_dd, beacon[i])
         }
         beacon <- c("\\1", "\\3", "\\5", "\\7")
-        repl_vals(rules$double_day_first, indices$double_day_first,
-                  beacon[i])
+        repl_vals(rules$dbl_dd_mm, indices$dbl_dd_mm, beacon[i])
         beacon <- c("\\3", "\\1", "\\7", "\\5")
-        repl_vals(rules$double_mth_first, indices$double_mth_first,
-                  beacon[i])
+        repl_vals(rules$dbl_mm_dd, indices$dbl_mm_dd, beacon[i])
     }
     invisible(tempDF)
 }
