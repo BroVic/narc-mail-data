@@ -1,0 +1,246 @@
+---
+title: Report on Data Restructuring Exercise for Nehemiah Apostolic Resource Centre,
+  Abuja
+author: "DevSolutions Ltd"
+params:
+  d: ../workbooks/
+output:
+  html_document: default
+  word_document: default
+---
+<style>
+  body {
+    text-align: justify;
+  }
+</style>
+
+```{r setup, include=FALSE}
+lapply(c("Amelia", "RSQLite", "dplyr", "ggplot2", "hellno", "readxl", "stringr", "tidyr"), 
+       library, character.only = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
+source("../src/helpers.R")
+```
+
+# Overview
+**Nehemiah Apostolic Resource Centre, Abuja**, is a Christian training centre established to equip and to empower and to release transformation agents also called change agents or reformers. The ministry is led by respected apostle and author, Rev. Obii Pax-Harry.
+
+In its more than ten years of operating within Nigeria, the ministry has accummulated significant data on its congregants, partners, ministry visitors, and beneficiaries of its various outreach programmes. The ministry also publishes a weekly newsletter which it sends to subscribers via electronic mail.
+
+The client informed the service provider that some newsletter subscribers had complained of receiving the periodical in duplicates and that the personalised greetings of several of these were incorrectly addressed. The visioner also intimated that she had a vision of vastly expanding the reach of the newsletter and having its management conform to international standards, and that she was inclined to start tapping into the power of analytics. To accomplish this, she believed that there was a need for a total overhaul of the Centres data management systems.
+
+After initial discussions, our team advised that there was a need for an on-site inspection of the data management processes at the Centre.
+
+# Findings
+Our team visited the NARC on 3 different occasions. The staff were receptive, cordial and cooperative but due to the time of our visits they were of limited use. During our first interview with the staff managing the database(s) we gathered the following:
+
+1. The data existed in different Microsoft Excel files, some of which had more than one spreadsheet.
+2. The data in each spreadsheet had different data fields
+3. The principal data collection instrument was the Guest Form of the ministry.
+4. The newsletter mailing list was being managed with *MailChimp*, a popular online mailing list management provider.
+5. The data were being manually uploaded to MailChimp, specifically the names and email addresses of prospective readers.
+6. The staff handling the data did not have sufficient knowledge of simple data management practices.
+7. There is not documented data management policy at the Centre and the staff do not have a specific workflow that they employ and data entry methods arbitrary, 
+8. There is no in-house mechanism for monitoring data quality.
+9. There is no back-up for the data, according to staff.
+
+# Methodology
+## The Rationale
+First of all, the team came to the decision that correcting the aforementtioned anomalies could not be carried out 'manually' without unpleasant consequences. These include:
+
+1. Loss of data integrity: One of the problems faced by NARC was that its team was oblivious of the growth of its exisiting datasets and was not averse to multiplying them at will. There is no way to humanly keep track of such data and any attempt to do so would make the quality of the data to be suspect.
+2. Partial or total data loss: With manual manipulation of such data comes the risk of data loss. Indeed there is absolutely no way to assure that the existing data is a true representation of the Centres work over the years, which is quite unfortunate.
+3. Reproducibility: For quality assurance, any manipulation of data such be done in such a way that it the entire process can be reproduced by non-involved third-party operator. This is clearly impossible after graphics based 'point-and-click' operations.
+4. Transparence and accountability: Data are arguably the most valuable resource of any modern venture. It is thus of vital importance that any additions, updates, storage, corrections and analyses are done with openness and readily subjected to scrutiny. Tracking these processes cannot be done if data are managed purely in a manual and arbitrary manner.
+5. Scalability: There is simply no way that NARC can accomplish its aim of reaching a wider audience, much less gaining insights from its data, if there is a continued reliance on their current approach
+
+In the light of the foregoing, it became apparent that there was a need to use programmatic approaches to devise solutions to these challenges. Beginning from the very first encounter with the data to the point of updating the newsletter's mailing list, it was decided that the only step that should be done by a human would be the entry of the data in the first place (naturally, the system would have to be maintained by people as well). Every step of this process is fully documented and fully reversible. It is also flexible, in that subtle improvements would be continually made via update, also taking into account concommitant changes in the software ecosystem.  
+
+## The Approach
+We are tackling the challenge presented to us in the following steps:
+
+1. Harmonisation of the muliplicity of datasets and their various formats.
+2. Unification of the data entry processes.
+3. Integration with MailChimp's application programming interface (API).
+4. Development of data monitoring tools
+5. Establishment of a reporting system
+
+Note that these are not necessarily going to be carried out in this order, but the most important step is that of **harmonisation**. All the other steps depend on the existence of a reliable dataset that is consistent and coherent. This interim report outlines the work done by our team in this regard.  
+
+## The Tools
+For data harmonisation, our team used **R**, a programming language and environment that is particulary suited for data science related tasks. For data storage we turned to **SQLite**, which is tested and trusted **relational database management system (RDBMS)** that is light-weight, modular and relatively easy to manage. These were downloaded from their respective official sites and installed on the computer at NARC where the data in question reside.  
+
+To ease the use of R, we also installed **RStudio**, which is an integrated development environment (IDE) for working with the language as well as other technologies that we are going to use such as C++ and JavaScript. It's job is to make working with R much easier for non-experts as well as to greatly improve productivity. For instance, this report is developed in RStudio, as it allows for the rendering of the various visualisations that are to follow&nbsp;--&nbsp;directly from the data and without any manipulation or tweaking.   
+
+## The Code
+We have created a repository at [GitHub.com](https://github.com/DevSolutions/narc-mail-data) that contains the code that was painstakingly written to enable the complete harmonisation of the data for the NARC mailing list. 
+
+# Technical Details
+## The Computing Environment
+```{r computer details}
+myComp <- Sys.info()
+```
+This report is being generated on the NARC Computer named `r myComp["nodename"]` with a `r myComp["sysname"]` with `r myComp["machine"]` architecture. The User Account in use is `r myComp["user"]`. All the Excel workbooks containing the data of interest have been collated into a directory (i.e. folder) called **_`r dQuote(params$d)`_**. Here are the Excel workbooks that we found in the folder:  
+```{r excel-headers, warning=FALSE}
+## Import Excel files into R
+files <- find_excel_files(params$d, quietly = TRUE)
+knitr::kable(basename(files), row.names = seq_along(files), col.names = "Name of Excel workbook", caption = "The list of Excel workbooks found")
+```
+
+Upon extraction of the individual spreadsheets from the Excel files, we note the various types and arrangement of the data fields. Here is an example taken from just 3 of the above listed files.  
+```{r spreadsheet extraction}
+excelList <- lapply(files, excelFile)
+
+dFrameList <- extract_spreadsheets(excelList[[1]])
+len <- length(excelList)
+if (len > 1) {
+    for (i in 2:len) {
+        tmp <- extract_spreadsheets(excelList[[i]])
+        dFrameList <- append(dFrameList, tmp)
+    }
+    df_row_num <- sapply(dFrameList, nrow)
+    dFrameList <- dFrameList[which(df_row_num != 0)]
+}
+
+## Identifying and afixing original headers
+dFrameList <- lapply(dFrameList, function(df) {
+    val <- locate_header(df, hdr = columnNames)
+    if (!is.null(val)) {
+        df <- df %>%
+            slice(val$nextrow:n())
+        if (!identical(ncol(df), length(val$header)))
+            stop("Mismatched dimensions of existing and updated headers.")
+        colnames(df) <- val$header
+        df
+    }
+    else {
+        df <- data.frame(0)
+    }
+})
+
+set.seed(123)
+tabls <- sample(length(dFrameList), 5, replace = FALSE)
+
+for (i in tabls) {
+code <- knitr::kable(colnames(dFrameList[[i]]), col.names = "Data fields")
+print(code)
+}
+```
+
+## The Data
+We asked staff at NARC to give us the desired format for the **end-result database** which was as follows  
+```{r variable list}
+
+columnNames <- c(
+    "serialno",
+    "name",
+    "phone",
+    "address",
+    "email",
+    "bday.day",
+    "bday.mth",
+    "wedann.day",
+    "wedann.mth",
+    "occupation",
+    "church",
+    "pastor",
+    "info.source"
+)
+knitr::kable(columnNames, col.names = "Data fields")
+```
+
+The most challenging issues with the existing data was a remarkable variety in the manner in which date-related entries were made. To deal with this problem, relatively complicated programme logic had to be written in order to reflect the different entry styles, and then to unify them. 
+
+```{r load data table}
+connec <- dbConnect(SQLite(), file.path(params$d, "harmonised-data/NARC-mailing-list.db"))
+mailDf <- dbReadTable(connec, "NARC_mail")
+dbDisconnect(connec)
+totalRecords <- nrow(mailDf)
+```
+
+Finally, all the different datasets were merged into one and saved into an SQLite database file on the same computer. Currently the mailing list has `r totalRecords` records. 
+
+### Missing Values
+There are many gaps as displayed in the chart below. This is not totally unexpected with these kind of databases. However, the magnitude of missing data could be reflective of inconsistence in data entry that arises from direct manipulation of spreadsheets, which is error-prone and highly subjective.  
+
+```{r missing email/phone}
+missmap(mailDf, main = "Missingness Map for NARC Mailing List")
+
+phoneClassified <- ifelse(is.na(mailDf$phone), "missing", "found")
+emailClassified <- ifelse(is.na(mailDf$email), "missing", "found")
+dfNew <- data.frame(phone = phoneClassified, email = emailClassified)
+dfNewGathered <- 
+    gather(dfNew, key = Field, value = missingStatus, phone, email)
+
+## Draw bar charts comparing existing and missing values
+titleFrag <- "Distribution of Existing vs. Missing Records:"
+phonePlot <- ggplot(dfNew, aes(phone)) + 
+    geom_bar(fill = c('darkgreen', 'darkred')) + 
+    ggtitle(paste(titleFrag, sQuote("Phone")))
+phonePlot
+emailPlot <- ggplot(dfNew, aes(email)) +
+    geom_bar(fill = c('darkgreen', 'darkred')) +
+    ggtitle(paste(titleFrag, sQuote("Email")))
+emailPlot
+```
+
+```{r extend data frame}
+extMailDf <- mailDf %>%
+    mutate(dup.email = duplicated(email, incomparables = NA)) %>%
+    mutate(dup.phone = duplicated(phone, incomparables = NA))
+
+numAllRecords <- nrow(extMailDf)
+numAllEmail <- length(na.exclude(extMailDf$email)) 
+numAllPhone <- length(na.exclude(extMailDf$phone))
+```
+
+### Duplications
+From the data, about `r round(numAllEmail / numAllRecords * 100, digits = 1)` percent have valid email addresses. Of these, `r sum(extMailDf$dup.email)` are duplicated (__`r round(sum(extMailDf$dup.email) / numAllEmail * 100, 1)`%__).  
+```{r duplicated email}
+dupEmailPlot <- ggplot(extMailDf, aes(dup.email)) +
+    geom_bar(fill = c("red", "darkgreen")) +
+    xlab('Emails addresses that are duplicated')
+dupEmailPlot
+``` 
+
+On a similar note, `r round(numAllPhone / numAllRecords * 100, 1)` mobile numbers were captured and among these __`r round(sum(extMailDf$dup.phone) / numAllPhone * 100, 1)`%__ were duplicated in the record.  
+```{r duplicated phone}
+dupPhonePlot <- ggplot(extMailDf, aes(dup.phone)) +
+    geom_bar(fill = c("red", "darkgreen")) +
+    xlab("Phone numbers that are duplicated")
+dupPhonePlot
+```
+
+```{r remove duplicates}
+noDuplicates <- extMailDf %>%
+    filter(!dup.phone | !dup.email)
+
+numNotDuplicated <- nrow(noDuplicates)
+```
+
+If all the records with either duplicated email addresses or phone numbers were to be excluded, their numbers would drop by `r round((1 - (numNotDuplicated / numAllRecords)) * 100, digits = 1)`% from the original `r numAllRecords` records to `r numNotDuplicated`.
+
+***
+To recapitulate, the major problems with the data are:
+
+1. Mulitiple storage sites with multiple structures and multiple entry formats.
+2. Chaotic approach to the entry of date-related fields.
+3. Vast missing data
+4. Widespread repetition of (semi)unique identifiers like email addresses and mobile numbers.
+5. Over-reliance on spreadsheet applications rather than robust and rigorous database management tools or technologies.
+
+
+# Recommendations  
+We would like NARC management to consider the following suggestions for the further improving of data management in the organisation:
+
+1. Development of an organisational data management policy.
+2. Training of relevant staff in data management, including statistical programming.
+3. Review of data collection format to include other important elements e.g. gender.
+4. Integration with mailing list service provider to ensure automated update and review of mailing list.
+5. Introduction of server-based input collection to enable update of the database from remote locations.
+6. Broadening the logic of the existing corrective scripts to enable the merging of some of the existing records, rather than totally discarding duplications.
+
+# Conclusion
+NARC intends to improve the use of its existing data, particularly with focus on its Newsletter mailing list, and also intends to start applying various kinds of analytics in its planning, decision-making and operations. DevSolutions Ltd. has undertaken to conduct a ground-up assessment of the situation and diagnosed some key issues that would hamper this new direction, and is offering its services to support NARC in achieving its desired goals. 
+
+***
+This report was built with *R Markdown* on `r format(Sys.Date(), "%a. %B %d, %Y")`
