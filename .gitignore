@@ -6,5 +6,5 @@ harmonised-data/*
 *.xls
 *.xlsx
 play.R
-project-commentary.Rmd
-workbooks/*
+workbooks/* 
+reports/* 
