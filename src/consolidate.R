@@ -55,32 +55,39 @@ pause()
 
 cat("* Sort the data frame by 'name':\n")
 arr <- df %>%
-  arrange(name) %>% 
   select(-serialno) %>% 
-  print()
-
+  distinct() %>% 
+  arrange(name)
+print(arr)
 
 cat("\nNext: Attempt to fill in missing values\n")  # use greedy algorithm
 pause()
 
+## Find repeated names and associated records
 ## List unique names
 uniq <- unique(arr$name)
-
-## Find repeated names and associated records
 cons <- map_dfr(uniq, function(N) {
-  index <- which(arr$name == N)
-  if (length(index > 1)) {
-    sprintf("* Merging available records for '%s':\n", N)
-    merg <- arr %>% 
-      filter(name %in% N) %>% 
-      map_dfc(function(x) {
-        U <- unique(x)
+  merg <- arr %>%
+      filter(name %in% N)
+  if (nrow(merg) > 1) {
+    cat(sprintf("* Merging available records for '%s':\n", N))
+    merg <- colnames(merg) %>%
+      map_dfc(function(var) {
+        U <- unique(merg[[var]])
         
-        ## where there is more than one distinct 
-        ## value, we present the user with options
+        ## where there is more than one distinct
+        ## value, present the user with options
         if (length(U) > 1) {
-          picked <- menu(choices = U, title = "Choose one of the following:")
-          val <- U[picked]
+          pick <-
+            menu(
+              choices = U,
+              title = paste(
+                "** Pick a value from the column",
+                sQuote(var),
+                "to use in the merged record:"
+              )
+            )
+          val <- U[pick]
         }
         else {
           val <- U
