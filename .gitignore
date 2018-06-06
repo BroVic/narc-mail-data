@@ -2,10 +2,11 @@
 .Rhistory
 .RData
 .Ruserdata
-harmonised-data/*
 *.xls
 *.xlsx
 play.R
 workbooks/*
 reports/*
 NARC_media.db
+sandbox
+data
