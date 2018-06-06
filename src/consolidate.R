@@ -8,30 +8,15 @@ library(RSQLite)
 library(tidyverse)
 library(rprojroot)
 
+
 ## Some housekeeping...
 root <- is_rstudio_project
-path_to_db <-
-  find_root_file("harmonised-data",
-                 "NARC-mailing-list.db",
-                 criterion = has_file("narc-mailing-list.Rproj"))
+crit <- has_file("narc-mailing-list.Rproj")
+path_to_db <- find_root_file("data", "NARC-mailing-list.db", criterion = crit)
+path_to_funs <- find_root_file("src", "funs.R", criterion = crit)
+source(path_to_funs)
 
-## Utility function
-pause <- function() {
-  if (interactive()) {
-    readline("Press ENTER to continue...")
-  }
-}
-
-## Import data
-# TODO: Examine this path
-if (!exists("dbcon")) {
-  dbcon <- dbConnect(SQLite(), path_to_db)
-  tabl <- grep("NARC_mail", dbListTables(dbcon), value = TRUE)
-  df <- dbReadTable(dbcon, tabl)
-  dbDisconnect(dbcon)
-  rm(dbcon)
-  df <- as_tibble(df)
-}
+df <- import_db(path_to_db, "NARC_mail")
 
 cat("\nOverview of the data:\n")
 glimpse(df)
