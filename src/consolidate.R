@@ -3,45 +3,34 @@
 ## Consolidate the database by merging repeated records
 ## ````````````````````````````````````````````````````
 
-
-library(RSQLite)
-library(tidyverse)
-library(rprojroot)
+cat("Loading dependencies...\n ")
+pkgs <- c("tidyverse", "RSQLite", "rprojroot")
+lapply(pkgs, require, character.only = TRUE)
+found <- pkgs %in% .packages()
+if (all(found)) {
+  cat("All required packages were successfully attached\n")
+}
 
 ## Some housekeeping...
 root <- is_rstudio_project
+criterion <- has_file("narc-mailing-list.Rproj")
 path_to_db <-
-  find_root_file("harmonised-data",
-                 "NARC-mailing-list.db",
-                 criterion = has_file("narc-mailing-list.Rproj"))
+  find_root_file("data", "NARC-mailing-list.db", criterion = criterion)
+path_to_funs <-
+  find_root_file("src", "funs.R", criterion = criterion)
 
-## Utility function
-pause <- function() {
-  if (interactive()) {
-    readline("Press ENTER to continue...")
-  }
-}
+source(path_to_funs)
+df <- import_db(path_to_db, "NARC_mail")
 
-## Import data
-# TODO: Examine this path
-if (!exists("dbcon")) {
-  dbcon <- dbConnect(SQLite(), path_to_db)
-  tabl <- grep("NARC_mail", dbListTables(dbcon), value = TRUE)
-  df <- dbReadTable(dbcon, tabl)
-  dbDisconnect(dbcon)
-  rm(dbcon)
-  df <- as_tibble(df)
-}
-
-cat("\nOverview of the data:\n")
+cat("Overview of the data:\n")
 glimpse(df)
 
-cat("\nNext: Check identifier variables for duplications\n")
+cat("Next: Check identifier variables for duplications\n")
 pause()
 invisible(df %>%
             select(name, phone, email) %>%
             {
-              cat("* Level of duplication:\n")
+              cat("* Number of duplications:\n")
               sapply(colnames(.), function(x) {
                 cat("** Column",
                     sQuote(x),
@@ -50,51 +39,55 @@ invisible(df %>%
                     "duplications\n")
               })
             })
-cat("\nNext: Aggregate the duplicated values\n")
+cat("Next: Aggregate the duplicated values\n")
 pause()
 
 cat("* Sort the data frame by 'name':\n")
 arr <- df %>%
-  select(-serialno) %>% 
-  distinct() %>% 
+  as_tibble() %>% 
+  select(-serialno) %>%
+  distinct() %>%
   arrange(name)
 print(arr)
 
-cat("\nNext: Attempt to fill in missing values\n")  # use greedy algorithm
+cat("Next: Attempt to fill in missing values\n")  # use greedy algorithm
 pause()
 
 ## Find repeated names and associated records
 ## List unique names
 uniq <- unique(arr$name)
 cons <- map_dfr(uniq, function(N) {
-  merg <- arr %>%
-      filter(name %in% N)
-  if (nrow(merg) > 1) {
+  
+  ## Extract a data frame of a given name
+  one_name <- arr %>%
+    filter(name %in% N)
+  
+  if (nrow(one_name) > 1) {
     cat(sprintf("* Merging available records for '%s':\n", N))
-    merg <- colnames(merg) %>%
+    one_name <- colnames(one_name) %>%
       map_dfc(function(var) {
-        U <- unique(merg[[var]])
+        val <- unique(one_name[[var]])
         
         ## where there is more than one distinct
         ## value, present the user with options
-        if (length(U) > 1) {
+        if (length(val) > 1) {
           pick <-
             menu(
-              choices = U,
+              choices = val,
               title = paste(
                 "** Pick a value from the column",
                 sQuote(var),
                 "to use in the merged record:"
               )
             )
-          val <- U[pick]
+          val[pick]
         }
         else {
-          val <- U
+          val
         }
-        val
       })
   }
+  else one_name
 })
 
 
