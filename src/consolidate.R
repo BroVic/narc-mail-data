@@ -92,3 +92,8 @@ cons <- map_dfr(uniq, function(N) {
 
 
 # TODO: After consolidation, carry out some integrity checks...
+
+# Store to a different table in the database
+dbcon <- dbConnect(SQLite(), "data/NARC-mailing-list.db")
+dbWriteTable(dbcon, "NARC_mail_consolidated", cons, overwrite = TRUE)
+dbDisconnect(dbcon)
