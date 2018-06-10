@@ -2,4 +2,4 @@
 
 $directory=$args[0]
 
-Rscript .\src\narc-dfmerge.R $directory
+Rscript .\src\harmonise.R $directory
