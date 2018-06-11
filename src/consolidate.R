@@ -3,26 +3,29 @@
 ## Consolidate the database by merging repeated records
 ## ````````````````````````````````````````````````````
 
-cat("Loading dependencies...\n ")
-pkgs <- c("tidyverse", "RSQLite", "rprojroot")
-lapply(pkgs, require, character.only = TRUE)
+cat("Loading dependencies... ")
+pkgs <- c("RSQLite", "dplyr", "purrr", "rprojroot")
+lapply(pkgs, function(x)
+  suppressPackageStartupMessages(require(x, character.only = TRUE))
+)
 found <- pkgs %in% .packages()
 if (all(found)) {
-  cat("All required packages were successfully attached\n")
+  cat("Done\n")
 }
 
 ## Some housekeeping...
 root <- is_rstudio_project
 criterion <- has_file("narc-mailing-list.Rproj")
+database <- "NARC-mailing-list.db"
 path_to_db <-
-  find_root_file("data", "NARC-mailing-list.db", criterion = criterion)
+  find_root_file("data", database, criterion = criterion)
 path_to_funs <-
   find_root_file("src", "funs.R", criterion = criterion)
 
 source(path_to_funs)
 df <- import_db(path_to_db, "NARC_mail")
 
-cat("Overview of the data:\n")
+cat("* Overview of the data:\n\n")
 glimpse(df)
 
 cat("Next: Check identifier variables for duplications\n")
@@ -56,16 +59,15 @@ pause()
 ## Find repeated names and associated records
 ## List unique names
 uniq <- unique(arr$name)
-cons <- map_dfr(uniq, function(N) {
+cons <- lapply(uniq, function(N) {
   
   ## Extract a data frame of a given name
-  one_name <- arr %>%
-    filter(name %in% N)
+  one_name <- filter(arr, name == N)
   
   if (nrow(one_name) > 1) {
     cat(sprintf("* Merging available records for '%s':\n", N))
     one_name <- colnames(one_name) %>%
-      map_dfc(function(var) {
+      lapply(function(var) {
         val <- unique(one_name[[var]])
         
         ## where there is more than one distinct
@@ -74,26 +76,29 @@ cons <- map_dfr(uniq, function(N) {
           pick <-
             menu(
               choices = val,
-              title = paste(
-                "** Pick a value from the column",
-                sQuote(var),
-                "to use in the merged record:"
-              )
+              title = paste("** Pick a value from the column", sQuote(var))
             )
           val[pick]
         }
-        else {
-          val
-        }
-      })
+        else val
+      }) %>% 
+      as_tibble()
   }
-  else one_name
-})
+  else {
+    one_name %>% as_tibble()
+  }
+}) %>%
+  bind_rows()
 
+if(exists("cons"))
+  cat("* Done merging.\n")
 
 # TODO: After consolidation, carry out some integrity checks...
 
 # Store to a different table in the database
-dbcon <- dbConnect(SQLite(), "data/NARC-mailing-list.db")
-dbWriteTable(dbcon, "NARC_mail_consolidated", cons, overwrite = TRUE)
+nuTabl <- "mail_consolid"
+cat(sprintf("* Store data in table '%s'... ", nuTabl))
+dbcon <- dbConnect(SQLite(), path_to_db)
+dbWriteTable(dbcon, nuTabl, cons, overwrite = TRUE)
 dbDisconnect(dbcon)
+cat("Done\n")
