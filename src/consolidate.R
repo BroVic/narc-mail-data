@@ -8,8 +8,9 @@ pkgs <- c("RSQLite", "dplyr", "purrr", "rprojroot")
 lapply(pkgs, function(x)
   suppressPackageStartupMessages(require(x, character.only = TRUE))
 )
-found <- pkgs %in% .packages()
-if (all(found)) {
+
+if (all(pkgs %in% .packages())) {
+  rm(pkgs)
   cat("Done\n")
 }
 
@@ -57,38 +58,7 @@ cat("Next: Attempt to fill in missing values\n")  # use greedy algorithm
 pause()
 
 ## Find repeated names and associated records
-## List unique names
-uniq <- unique(arr$name)
-cons <- lapply(uniq, function(N) {
-  
-  ## Extract a data frame of a given name
-  one_name <- filter(arr, name == N)
-  
-  if (nrow(one_name) > 1) {
-    cat(sprintf("* Merging available records for '%s':\n", N))
-    one_name <- colnames(one_name) %>%
-      lapply(function(var) {
-        val <- unique(one_name[[var]])
-        
-        ## where there is more than one distinct
-        ## value, present the user with options
-        if (length(val) > 1) {
-          pick <-
-            menu(
-              choices = val,
-              title = paste("** Pick a value from the column", sQuote(var))
-            )
-          val[pick]
-        }
-        else val
-      }) %>% 
-      as_tibble()
-  }
-  else {
-    one_name %>% as_tibble()
-  }
-}) %>%
-  bind_rows()
+cons <- fix_multip(arr)
 
 if(exists("cons"))
   cat("* Done merging.\n")
@@ -96,9 +66,9 @@ if(exists("cons"))
 # TODO: After consolidation, carry out some integrity checks...
 
 # Store to a different table in the database
-nuTabl <- "mail_consolid"
-cat(sprintf("* Store data in table '%s'... ", nuTabl))
+nuTbl <- "mail_consolid"
+cat(sprintf("* Store data in table '%s'... ", nuTbl))
 dbcon <- dbConnect(SQLite(), path_to_db)
-dbWriteTable(dbcon, nuTabl, cons, overwrite = TRUE)
+dbWriteTable(dbcon, nuTbl, cons, overwrite = TRUE)
 dbDisconnect(dbcon)
 cat("Done\n")
