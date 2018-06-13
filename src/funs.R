@@ -28,3 +28,42 @@ pause <- function() {
     readline("Press ENTER to continue...")
   }
 }
+
+
+## Allows user to interactively fix multiple entries (by variable)
+fix_multip <- function(dataframe) {
+  uniq <- unique(dataframe$name)
+  lapply(uniq, function(N) {
+    ## Extract a data frame of a given name
+    one_name <- filter(dataframe, name == N)
+    
+    if (nrow(one_name) > 1) {
+      cat(sprintf("* Merging available records for '%s':\n", N))
+      one_name <- colnames(one_name) %>%
+        sapply(
+          simplify = FALSE,
+          FUN = function(var) {
+            val <- unique(one_name[[var]])
+            
+            ## where there is more than one distinct
+            ## value, present the user with options
+            if (length(val) > 1) {
+              pick <-
+                menu(
+                  choices = val,
+                  title = paste("** Pick a value from the column", sQuote(var))
+                )
+              val[pick]
+            }
+            else
+              val
+          }
+        )
+    }
+    else {
+      one_name
+    }
+  }) %>%
+    lapply(as_tibble) %>%
+    bind_rows()
+}
