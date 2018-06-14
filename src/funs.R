@@ -38,12 +38,17 @@ fix_multip <- function(dataframe) {
     one_name <- filter(dataframe, name == N)
     
     if (nrow(one_name) > 1) {
-      cat(sprintf("* Merging available records for '%s':\n", N))
+      cat(sprintf("* Merging available records for '%s'\n", N))
       one_name <- colnames(one_name) %>%
         sapply(
           simplify = FALSE,
           FUN = function(var) {
             val <- unique(one_name[[var]])
+            
+            ## Don't present NAs as options
+            if(!all(is.na(val))) {
+              val <- val[!is.na(val)]
+            }
             
             ## where there is more than one distinct
             ## value, present the user with options
@@ -51,7 +56,7 @@ fix_multip <- function(dataframe) {
               pick <-
                 menu(
                   choices = val,
-                  title = paste("** Pick a value from the column", sQuote(var))
+                  title = sprintf("** Pick a value from the column '%s':", var)
                 )
               val[pick]
             }
