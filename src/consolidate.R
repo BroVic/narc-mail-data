@@ -9,7 +9,7 @@ lapply(pkgs, function(x)
   suppressPackageStartupMessages(require(x, character.only = TRUE))
 )
 
-if (all(pkgs %in% .packages())) {
+if (all(pkgs %in% .packages())) { 
   rm(pkgs)
   cat("Done\n")
 }
@@ -67,20 +67,81 @@ if(exists("cons")) {
   print(cons)
 }
 
+cat("NEXT: Check integrity of the data. (Please review the output!)\n")
+pause()
+
+cat("* Type checking... ")
+if (identical(sapply(arr, typeof), sapply(cons, typeof))) {
+  cat("OK\n")
+} else cat("Failed\n")
+
+cat("* Empty fields?... ")
+if (any(sapply(cons, function(x) all(is.na(x))))) {
+  cat("No\n")
+} else cat("NOTE\n")
+
+cat("* Missing names?... ")
+if (anyNA(cons$name)) {
+  missed <- which(is.na(cons$name))
+  cat(
+    "Names were missing from",
+    ngettext(length(missed), "row", "rows"),
+    paste(as.character(missed, collapse = ", ")),
+    "\n")
+} else cat("No\n")
+
+cat("* Duplicated names?... ")
+if (anyDuplicated(cons$name)) {
+  cat("Yes\n")
+} else cat("No\n")
+
+cat("* Duplicated phone numbers?... ")
+if (anyDuplicated(cons$phone)) {
+  cat("Yes\n")
+} else cat("No\n")
+
+cat("* Duplicated email addresses?... ")
+if (anyDuplicated(cons$email)) {
+  cat("Yes\n")
+} else cat("No\n")
+
+cat("* Empty rows?... ")
+len <- ncol(cons)
+emptyRows <- apply(cons, 1, function(x) all(is.na(x)))
+if (any(emptyRows)) {
+  cat("Yes\n")
+} else cat("No\n")
+
+cat("* Proportion missing... ")
+wb <- dim(cons)
+allCells <- wb[1] * wb[2]
+allEmpty <- sum(is.na(cons))
+perC <- round(allEmpty / allCells * 100)
+cat(paste0(allEmpty, "/", allCells, " (approx. ", perC, "%)\n"))
+
+
 cat("NEXT: Save consolidated data to disk\n")
 pause()
 
 nuTbl <- "mail_consolid"
 cat(sprintf("* Store data in table '%s'... ", nuTbl))
 dbcon <- dbConnect(SQLite(), path_to_db)
-dbWriteTable(dbcon, nuTbl, cons, overwrite = TRUE)
-dbDisconnect(dbcon)
-cat("Done\n")
+if (nuTbl %in% dbListTables(dbcon)) {
+  write <- 
+    menu(choices = c("Yes", "No"),
+         title = "\nYou are about to overwrite an existing table. Continue?")
+}
 
-# cat("Conducting integrity checks... ")
+if (identical(write, 1L)) {
+  dbWriteTable(dbcon, nuTbl, cons, overwrite = TRUE)
+  cat("* The data were saved.\nConsolidation completed.\n")
+} else if (identical(write, 2L)) {
+  message("The data were not stored on disk.")
+}
+
+dbDisconnect(dbcon)
+
+# cat("Checking database integrity... ")
 # dbcon <- dbConnect(SQLite(), path_to_db)
 # chk <- dbReadTable(dbcon, nuTbl)
 # dbDisconnect(dbcon)
-
-
-cat("Finished successfully.\n")
