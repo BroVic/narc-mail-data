@@ -10,7 +10,7 @@ if (interactive()) {
 } else {
   args <- commandArgs(trailingOnly = TRUE)
   if (!is.null(args))
-    workbooks <- args
+    workbooks <- args[1]
 }
 
 if (!dir.exists(workbooks))

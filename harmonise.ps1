@@ -1,28 +1,27 @@
 # harmonise.ps1
 
 ## Script to launch harmonisation of spreadsheets
-$directory=$args[0]
-$numArgs = $args.Length
-$srcfile = ".\src\harmonise.R"
-$flags = "--vanilla"
-$options = "--verbose"
 
+$numArgs = $args.Length
 if ($($numArgs -gt 1))
 {
   Write-Warning "$numArgs arguments were supplied but only the first was used"
 }
 
+$directory=$args[0]
 if ($directory -ne $null) {
   $isValidPath = Test-Path -Path $directory
 } else {
-  Write-Host "Usage: harmonise.ps1 <path/to/dir>"
+  Write-Host "Usage: ./harmonise.ps1 <path/to/dir>"
   exit
 }
 
-
+$srcfile = ".\src\harmonise.R"
+$Rflags = "--vanilla"
+$options = "--verbose"
 if ($isValidPath)
 {
-  Rscript $options $flags $srcfile $directory
+  Rscript $options $Rflags $srcfile $directory
 } else {
   Write-output "Path to directory '$directory' was not found"
   }
