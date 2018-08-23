@@ -40,13 +40,13 @@ aggregateDuplicatedVals <- function(x)
 
 
 
-fillMissingVals <- function(d)
+fillMissingVals <- function(d, skip = FALSE)
 {
-  cat("NEXT: Attempt to fill in missing values\n")  # use greedy algorithm
-  pause()
+  if (skip)
+    return(d)
   
   ## Find repeated names and associated records
-  cons <- .fixMultipleValues(df)
+  cons <- .fixMultipleValues(d)
   if(exists("cons")) {
     cat("* Merge completed.\n\n* View the data:\n")
     print(cons)
@@ -60,61 +60,32 @@ fillMissingVals <- function(d)
 
 
 
-checkDataIntegrity <- function(df)
+checkDataIntegrity <- function(df_r, df_p, skip = FALSE)
 {
+  if (skip)
+    return(NULL)
   cat("NEXT: Check integrity of the data. (Please review the output!)\n")
   pause()
-  cat("* Type checking... ")
-  if (identical(sapply(arr, typeof), sapply(df, typeof))) {
-    cat("OK\n")
-  } else
-    cat("Failed\n")
-  cat("* Empty fields?... ")
-  if (any(sapply(df, function(x)
-    all(is.na(x))))) {
-    cat("No\n")
-  } else
-    cat("NOTE\n")
-  cat("* Missing names?... ")
-  if (anyNA(df$name)) {
-    missed <- which(is.na(df$name))
-    cat(
-      "Names were missing from",
-      ngettext(length(missed), "row", "rows"),
-      paste(as.character(missed, collapse = ", ")),
-      "\n"
-    )
-  } else
-    cat("No\n")
-  cat("* Duplicated names?... ")
-  if (anyDuplicated(df$name)) {
-    cat("Yes\n")
-  } else
-    cat("No\n")
-  cat("* Duplicated phone numbers?... ")
-  if (anyDuplicated(df$phone)) {
-    cat("Yes\n")
-  } else
-    cat("No\n")
-  cat("* Duplicated email addresses?... ")
-  if (anyDuplicated(df$email)) {
-    cat("Yes\n")
-  } else
-    cat("No\n")
-  cat("* Empty rows?... ")
-  len <- ncol(df)
-  emptyRows <- apply(df, 1, function(x)
-    all(is.na(x)))
-  if (any(emptyRows)) {
-    cat("Yes\n")
-  } else
-    cat("No\n")
-  cat("* Proportion missing... ")
-  wb <- dim(df)
-  allCells <- wb[1] * wb[2]
+  testsPassed <- NULL %>% 
+    typesUnchanged(df_r, df_p) %>% 
+    noEmptyFields(df_p) %>% 
+    noMissingNames(df_p) %>% 
+    noDuplicatedNames(df_p) %>% 
+    noDuplicatedPhone(df_p) %>% 
+    noDuplicatedEmail(df_p) %>%
+    noEmptyRows(df_p)
+  
+  if (!all(testsPassed)) {
+    message("Some data integrity checks failed. Kindly review the output.")
+  }
+  
+  cat("* Proportion of cells with missing values... ")
+  htWidth <- dim(df)
+  allCells <- htWidth[1] * htWidth[2]
   allEmpty <- sum(is.na(df))
   perC <- round(allEmpty / allCells * 100)
   cat(paste0(allEmpty, "/", allCells, " (approx. ", perC, "%)\n"))
+  invisible(0)
 }
 
 
@@ -131,18 +102,18 @@ storeConsolidatedData <- function(df, db)
   nuTbl <- "mail_consolid"
   cat(sprintf("* Store data in table '%s'... ", nuTbl))
   dbcon <- dbConnect(SQLite(), db)
+  on.exit(dbDisconnect(dbcon))
   if (nuTbl %in% dbListTables(dbcon)) {
     write <- 
       menu(choices = c("Yes", "No"),
            title = "\nYou are about to overwrite an existing table. Continue?")
   }
   if (identical(write, 1L)) {
-    dbWriteTable(dbcon, nuTbl, cons, overwrite = TRUE)
+    dbWriteTable(dbcon, nuTbl, df, overwrite = TRUE)
     cat("* The data were saved.\nConsolidation completed.\n")
   } else if (identical(write, 2L)) {
     message("The data were not stored on disk.")
   }
-  on.exit()
 }
 
 
@@ -157,21 +128,23 @@ storeConsolidatedData <- function(df, db)
 ## @param db An SQLite database
 ## @param table The table to be imported
 ## @return Returns an object of class \code{data.frame}
-import_db <- function(db, table) {
-  require(RSQLite, quietly = TRUE)
-  
-  if (!endsWith(db, ".db"))
-    stop("Unsupported file format")
+importDataFromDb <- function(db, table) {
+  stopifnot(is.character(db), is.character(table))
+  stopifnot(file.exists(db))
+  bin <- readBin(db, what = 'raw', n = 16L)
+  if (!identical(rawToChar(bin), "SQLite format 3"))
+    stop("'db' is not a supported file format")
   dbcon <- dbConnect(SQLite(), db)
+  on.exit(dbDisconnect(dbcon))
   if (!dbIsValid(dbcon))
     stop("There was a problem making the database connection")
   
   if (table %in% dbListTables(dbcon))
     df <- dbReadTable(dbcon, table)
-  else
+  else {
     message("No table called ", sQuote(table), "in ", sQuote(basename(db)))
-  on.exit(dbDisconnect(dbcon))
-  df
+    return(NULL)
+  }
 }
 
 
