@@ -60,40 +60,6 @@ fillMissingVals <- function(d, skip = FALSE)
 
 
 
-checkDataIntegrity <- function(df_r, df_p, skip = FALSE)
-{
-  if (skip)
-    return(NULL)
-  cat("NEXT: Check integrity of the data. (Please review the output!)\n")
-  pause()
-  testsPassed <- NULL %>% 
-    typesUnchanged(df_r, df_p) %>% 
-    noEmptyFields(df_p) %>% 
-    noMissingNames(df_p) %>% 
-    noDuplicatedNames(df_p) %>% 
-    noDuplicatedPhone(df_p) %>% 
-    noDuplicatedEmail(df_p) %>%
-    noEmptyRows(df_p)
-  
-  if (!all(testsPassed)) {
-    message("Some data integrity checks failed. Kindly review the output.")
-  }
-  
-  cat("* Proportion of cells with missing values... ")
-  htWidth <- dim(df)
-  allCells <- htWidth[1] * htWidth[2]
-  allEmpty <- sum(is.na(df))
-  perC <- round(allEmpty / allCells * 100)
-  cat(paste0(allEmpty, "/", allCells, " (approx. ", perC, "%)\n"))
-  invisible(0)
-}
-
-
-
-
-
-
-
 
 storeConsolidatedData <- function(df, db)
 {
