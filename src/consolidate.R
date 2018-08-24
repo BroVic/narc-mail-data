@@ -3,7 +3,7 @@
 ## Consolidate the database by merging repeated records
 ## ````````````````````````````````````````````````````
 library(NARCcontacts)
-
+library(rprojroot)
 ## Make relevant files discoverable in-project
 root <- is_rstudio_project
 criterion <- has_file("narc-mailing-list.Rproj")
