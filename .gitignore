@@ -2,12 +2,9 @@
 .Rhistory
 .RData
 .Ruserdata
-*.xls
-*.xlsx
-play.R
 workbooks/*
 reports/*
-NARC_media.db
 sandbox
-data
-README.Rmd
+README.html 
+README.Rmd 
+data*/ 
