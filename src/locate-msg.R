@@ -21,7 +21,7 @@ cat("Looking for media files in",
     "and its subfolders... ")
 
 pat <- ".wav$|.mp3$|.mp4$|.wma$|.wmv$|.midi$"
-list <- list.files(
+fileList <- list.files(
   path = root,
   pattern = pat,
   recursive = TRUE,
@@ -31,14 +31,14 @@ list <- list.files(
   include.dirs = FALSE
 )
 
-if (is.null(list) | !length(list)) {
+if (is.null(fileList) | !length(fileList)) {
   cat("Failed\n")
   message("No media files were discovered in ", sQuote(root))
 } else {
   cat("Done\n")
   
   myComp <- Sys.info()
-  df <- purrr::map_dfr(list, function(media) {
+  df <- purrr::map_dfr(fileList, function(media) {
     ## Extract the metadata of each file so listed
     details <- file.info(media)
     
