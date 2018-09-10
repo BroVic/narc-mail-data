@@ -39,7 +39,6 @@ if (is.null(fileList) | !length(fileList)) {
   
   myComp <- Sys.info()
   df <- purrr::map_dfr(fileList, function(media) {
-    ## Extract the metadata of each file so listed
     details <- file.info(media)
     
     ## Capitalised file format as part of record
@@ -49,7 +48,7 @@ if (is.null(fileList) | !length(fileList)) {
         regexpr(pat, media, ignore.case = TRUE) + 1,
         nchar(media)))
     
-    data.frame(
+    tibble::tibble(
       title = NA_character_,
       minister = NA_character_,
       created = details$ctime,
@@ -60,8 +59,7 @@ if (is.null(fileList) | !length(fileList)) {
       filename = basename(media),
       location = dirname(media),
       computer = myComp["nodename"],
-      user = myComp["user"],
-      stringsAsFactors = FALSE
+      user = myComp["user"]
     )
   })
   
