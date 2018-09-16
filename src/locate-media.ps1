@@ -18,14 +18,14 @@ $Database = "../data/NARC_TEST.db"
 $dbCreated = Test-Path $Database
 if(!$dbCreated) {
     $SQLQuery = "CREATE TABLE messages (
-        ID INT PRIMARY KEY,
+        ID INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT,
         minister TEXT,
         created DATETIME NOT NULL,
         modified DATETIME NOT NULL,
         accessed DATETIME NOT NULL,
         format TEXT NOT NULL,
-        size INT NOT NULL,
+        size INTEGER NOT NULL,
         filename TEXT NOT NULL,
         location TEXT NOT NULL,
         computer TEXT NOT NULL,
@@ -35,9 +35,24 @@ if(!$dbCreated) {
     Invoke-SqliteQuery -Query $SQLQuery -DataSource $Database
 }
 
+function Get-Opt
+{
+    $opt = Read-Host -Prompt "View the resulting schema? (Y/N)"
+    switch ($opt)
+    {
+        Y { $choice = "Y" }
+        N { $choice = "N" }
+    }
+    return $choice
+}
+
+ 
+if (Get-Opt -eq 'Y') {
+    Invoke-SqliteQuery -DataSource $Database -Query "PRAGMA table_info(messages)"
+}
 
 # Collect a list of file media files 
-$pattern = "\.(wav|mp3|mp4|wma|wmv|midi)$"
+$pattern = "\.(wav|mp3|mp4|wma|wmv|midi|m4a)$"
 $fileList = $(Get-ChildItem "..\tests" -Recurse -File) -match $pattern
 
 if ($fileList -eq $null) {
