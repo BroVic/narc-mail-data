@@ -1,6 +1,8 @@
 ﻿# rename-media.ps1
+# Companion script to 'locate-media.ps1'
 
 # Copyright (c) 2018 DevSolutions Ltd. All rights reserved.
+# See LICENSE for details.
 
 # ------------------------------------------------------------
 # Powershell script for reviewing, identifying and 
@@ -19,35 +21,30 @@ if (-not ($(Get-Childitem $modLoc).Name.Contains("PSSQLite"))) {
 }
 Import-Module PSSQLite
 
+# Create an SQLite connection
+$Conn = New-SQLiteConnection -DataSource ".\data\media.db"
 
-# Fetch a record
-$DB = "..\data\NARC_TEST.db"
-$query = "SELECT DISTINCT ID, location FROM messages WHERE title IS NULL"
-$idBased = Invoke-SqliteQuery -DataSource $DB -Query $query
-
-$query = "SELECT DISTINCT location FROM messages WHERE title IS NULL"
-$locBased = Invoke-SqliteQuery -DataSource $DB -Query $query
-$mediaFolder = $locBased.location
+# Fetch a record of files without titles
+$query = "SELECT filepath FROM messages WHERE title IS NULL"
+[array]$arrFiles = Invoke-SqliteQuery -SQLiteConnection $Conn -Query $query
 
 Add-Type -AssemblyName presentationCore
 $mediaPlayer = New-Object System.Windows.Media.MediaPlayer
 
-$query = "SELECT filename FROM messages WHERE location = '$mediaFolder'"
-[array]$allFiles = Invoke-SqliteQuery -DataSource $DB -Query $query
-
 # Review the files in the given folder
-foreach ($file in $allFiles)
-{
-    # First get the unique identifier of this particular file
-    $file = $file.filename
-    $query = "SELECT ID FROM messages WHERE filename = '$file'"
-    [long]$ID = $(Invoke-SqliteQuery -DataSource $DB -Query $query).ID
-    $mediaPlayer.Open("$file")
-    [string]$ans = Read-Host -Prompt "You are about to play the file '$file'. Continue? (Y/N)"
+foreach ($file in $arrFiles.filepath)
+{    
+    # Get the unique identifier of this particular file
+    $query = "SELECT ID FROM messages WHERE filepath = '$file'"
+    [long]$ID = $(Invoke-SqliteQuery -SQLiteConnection $Conn -Query $query).ID
+
+    $filename = Split-Path $file -Leaf
+    [string]$ans = Read-Host -Prompt "`nYou are about to play this file: '$filename'.`nContinue? (Y/N)"
     if ($ans -eq 'Y')
     {
+        $mediaPlayer.Open("$file")
         $mediaPlayer.Play()
-        $ans = Read-Host -Prompt "You are currently listening to '$file'. To stop play, type 'q'"
+        $ans = Read-Host -Prompt "Now Playing - '$filename'.`nTo stop playback, type 'q'"
         if ($ans -eq 'q')
         {
             $mediaPlayer.Stop()
@@ -55,15 +52,26 @@ foreach ($file in $allFiles)
             if ($ans -eq 'Y') 
             {
                 # Edit file attribute
-                [string]$newTitle = Read-Host -Prompt "Enter a new 'title' for this file (without quotes)"
+                [string]$newTitle = Read-Host -Prompt "Enter a new 'title' field for this file (without quotes)"
                 $query = "UPDATE messages SET title = '$newTitle' WHERE ID = $ID"
-                Invoke-SqliteQuery -DataSource $DB -Query $query
-                $(Invoke-SqliteQuery -DataSource $DB -Query "SELECT * FROM messages WHERE ID = $ID")[0]
-               
+                Invoke-SqliteQuery -SQLiteConnection $Conn -Query $query
+
+                ## TODO: Add option for updating record for 'minister'
+
+                # View some selected current attributes
+                Write-Host "Status:`n" -ForegroundColor Yellow
+                $query = "SELECT title, minister, filename, location FROM messages WHERE ID = $ID"
+                Invoke-SqliteQuery -SQLiteConnection $Conn -Query $query
             }
-            if ($(Read-Host -Prompt "Listen to another file? (Y/N)") -eq 'N') { break }
+            $ans = Read-Host -Prompt "Listen to another file? (Y/N)"
+            if ($ans -eq 'N') {
+                $mediaPlayer.Close()
+                break
+            }
         }
+        $mediaPlayer.Close()
     }
+    
 }
 
 
