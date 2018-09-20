@@ -9,6 +9,7 @@
 # relabelling audio and video nedia files in a database
 # ------------------------------------------------------------
 
+# Installation of PSSQLite Module (when necessary)
 $modLoc = "$env:USERPROFILE\Documents\WindowsPowerShell\Modules"
 if (-not ($(Get-Childitem $modLoc).Name.Contains("PSSQLite"))) {
     if ($PSVersionTable.PSVersion.Major -lt 5) {
@@ -20,6 +21,23 @@ if (-not ($(Get-Childitem $modLoc).Name.Contains("PSSQLite"))) {
     }
 }
 Import-Module PSSQLite
+
+# Custom function for editing records in the database
+function Edit-Record
+{
+    param(
+        [string]$Field,
+        [int]$UniqueId,
+        $Connection
+        )
+    $prompt = "Enter a new '$Field' field for this file or type '-j' to skip"
+    [string]$newField = Read-Host -Prompt $prompt
+    if ($newField -ne '-j') {
+        $stmnt = "UPDATE messages SET title = '$newField' WHERE ID = $ID"
+        Invoke-SqliteQuery -SQLiteConnection $Connection -Query $stmnt
+    }
+    else { Write-Host "'$Field' was skipped`n" }
+}
 
 # Create an SQLite connection
 $Conn = New-SQLiteConnection -DataSource ".\data\media.db"
@@ -53,22 +71,6 @@ foreach ($file in $arrFiles.filepath)
         $ans = Read-Host -Prompt "Edit the record for this media file? (Y/N)"
         if ($ans -eq 'Y') 
         {
-            function Edit-Record
-            {
-                param(
-                    [string]$Field,
-                    [int]$UniqueId,
-                    $Connection
-                    )
-                $prompt = "Enter a new '$Field' field for this file or type '-j' to skip"
-                if ($prompt -ne '-j') {
-                    [string]$newField = Read-Host -Prompt $prompt
-                    $stmnt = "UPDATE messages SET title = '$newField' WHERE ID = $ID"
-                    Invoke-SqliteQuery -SQLiteConnection $Connection -Query $stmnt
-                }
-                else { Write-Host "'$Field' was skipped`n" }
-            }
-
             Edit-Record -Field "title" -UniqueId $ID -Connection $Conn
             Edit-Record -Field "minister" -UniqueId $ID -Connection $Conn
 
