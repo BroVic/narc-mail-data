@@ -26,54 +26,62 @@ $Conn = New-SQLiteConnection -DataSource ".\data\media.db"
 
 # Fetch a record of files without titles
 $query = "SELECT filepath FROM messages WHERE title IS NULL"
+
 [array]$arrFiles = Invoke-SqliteQuery -SQLiteConnection $Conn -Query $query
+$numFiles = $arrFiles.Count
+Read-Host -Prompt "`n$numFiles records are avaiable for editing. Press ENTER to continue"
 
 Add-Type -AssemblyName presentationCore
 $mediaPlayer = New-Object System.Windows.Media.MediaPlayer
 
-# Review the files in the given folder
+# Loop through the list of files, playing them one after the other
+# and making any relevant edits to the records in the database
 foreach ($file in $arrFiles.filepath)
 {    
     # Get the unique identifier of this particular file
     $query = "SELECT ID FROM messages WHERE filepath = '$file'"
     [long]$ID = $(Invoke-SqliteQuery -SQLiteConnection $Conn -Query $query).ID
 
+    $mediaPlayer.Open("$file")
+    $mediaPlayer.Play()
+
     $filename = Split-Path $file -Leaf
-    [string]$ans = Read-Host -Prompt "`nYou are about to play this file: '$filename'.`nContinue? (Y/N)"
-    if ($ans -eq 'Y')
+    [string]$ans = Read-Host -Prompt "`nNow Playing - '$filename'.`nTo stop playback, type 'q'"
+    if ($ans -eq 'q')
     {
-        $mediaPlayer.Open("$file")
-        $mediaPlayer.Play()
-        $ans = Read-Host -Prompt "Now Playing - '$filename'.`nTo stop playback, type 'q'"
-        if ($ans -eq 'q')
+        $mediaPlayer.Stop()
+        $ans = Read-Host -Prompt "Edit the record for this media file? (Y/N)"
+        if ($ans -eq 'Y') 
         {
-            $mediaPlayer.Stop()
-            $ans = Read-Host -Prompt "Record a new title for this media file? (Y/N)"
-            if ($ans -eq 'Y') 
+            function Edit-Record
             {
-                # Edit file attribute
-                [string]$newTitle = Read-Host -Prompt "Enter a new 'title' field for this file (without quotes)"
-                $query = "UPDATE messages SET title = '$newTitle' WHERE ID = $ID"
-                Invoke-SqliteQuery -SQLiteConnection $Conn -Query $query
-
-                ## TODO: Add option for updating record for 'minister'
-
-                # View some selected current attributes
-                Write-Host "Status:`n" -ForegroundColor Yellow
-                $query = "SELECT title, minister, filename, location FROM messages WHERE ID = $ID"
-                Invoke-SqliteQuery -SQLiteConnection $Conn -Query $query
+                param(
+                    [string]$Field,
+                    [int]$UniqueId,
+                    $Connection
+                    )
+                $prompt = "Enter a new '$Field' field for this file or type '-j' to skip"
+                if ($prompt -ne '-j') {
+                    [string]$newField = Read-Host -Prompt $prompt
+                    $stmnt = "UPDATE messages SET title = '$newField' WHERE ID = $ID"
+                    Invoke-SqliteQuery -SQLiteConnection $Connection -Query $stmnt
+                }
+                else { Write-Host "'$Field' was skipped`n" }
             }
-            $ans = Read-Host -Prompt "Listen to another file? (Y/N)"
-            if ($ans -eq 'N') {
-                $mediaPlayer.Close()
-                break
-            }
+
+            Edit-Record -Field "title" -UniqueId $ID -Connection $Conn
+            Edit-Record -Field "minister" -UniqueId $ID -Connection $Conn
+
+            # View selected fields
+            Write-Host "Status:`n" -ForegroundColor Yellow
+            $query = "SELECT title, minister, filename FROM messages WHERE ID = $ID"
+            Invoke-SqliteQuery -SQLiteConnection $Conn -Query $query
         }
-        $mediaPlayer.Close()
+        $ans = Read-Host -Prompt "Listen to another file? (Y/N)"
+        if ($ans -eq 'N') { break}
     }
-    
-}
-
+ }
+$mediaPlayer.Close()
 
 # References: 
 # 1. http://eddiejackson.net/wp/?p=9268
