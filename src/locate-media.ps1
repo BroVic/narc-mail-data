@@ -16,9 +16,25 @@
   https://github.com/RamblingCookieMonster/PSSQLite/blob/master/README.md 
 #>
 
+# Installation of PSSQLite Module (when necessary)
+$modLoc = "$env:USERPROFILE\Documents\WindowsPowerShell\Modules"
+if (-not ($(Get-Childitem $modLoc).Name.Contains("PSSQLite"))) {
+    $psVer = $PSVersionTable.PSVersion.Major
+    if ($psVer -lt 5) {
+        # $url = 'https://github.com/RamblingCookieMonster/PSSQLite.git'
+        # Invoke-Expression $(New-Object System.Net.WebClient).DownloadString($url)
+        Write-Host "Download of PSSQLite not yet implemented for $psVer `n"
+    }
+    else {
+        Write-Host "Installing PSSQLite Module... "
+        Install-Module PSSQLite -Scope CurrentUser
+        Write-Host "Done`n"
+    }
+}
+Import-Module PSSQLite
 
 # Collect a list of media files
-[string]$srchRoot = Read-Host -Prompt "Enter search path"
+[string]$srchRoot = Read-Host -Prompt "Enter search path of root directory"
 if (-not $(Test-Path $srchRoot)) { 
     Write-Error "Path does not exist" 
 }
@@ -36,10 +52,9 @@ else {
 
 # Connect to database
 # If table does not exist, create new one
-Import-Module PSSQLite
-
-[string]$Database = Read-Host -Prompt "Provide path to database"
-$SQLQuery = "CREATE TABLE IF NOT EXISTS messages (
+[string]$Database = Read-Host -Prompt "Provide path to new/existing database"
+[string]$table = Read-Host -Prompt "Enter the name of the table"
+$SQLQuery = "CREATE TABLE IF NOT EXISTS $table (
     ID INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT,
     minister TEXT,
@@ -70,7 +85,7 @@ function Get-Opt
 
  
 if (Get-Opt -eq 'Y') {
-    Invoke-SqliteQuery -DataSource $Database -Query "PRAGMA table_info(messages)"
+    Invoke-SqliteQuery -DataSource $Database -Query "PRAGMA table_info($table)"
 }
 
 foreach ($file in $fileList.FullName) 
@@ -81,7 +96,7 @@ foreach ($file in $fileList.FullName)
         $file = $newName
     }
     $props = Get-ItemProperty $file
-    $SQLQuery = "INSERT INTO messages (
+    $SQLQuery = "INSERT INTO $table (
                      created,
                      modified,
                      accessed,
@@ -119,5 +134,4 @@ foreach ($file in $fileList.FullName)
 }
 
 # Display the state of the database after operation completes
-Invoke-SqliteQuery -DataSource $Database -Query "SELECT * FROM messages LIMIT 6"
-
+Invoke-SqliteQuery -DataSource $Database -Query "SELECT * FROM $table LIMIT 6"

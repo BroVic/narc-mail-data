@@ -9,17 +9,6 @@
 # relabelling audio and video nedia files in a database
 # ------------------------------------------------------------
 
-# Installation of PSSQLite Module (when necessary)
-$modLoc = "$env:USERPROFILE\Documents\WindowsPowerShell\Modules"
-if (-not ($(Get-Childitem $modLoc).Name.Contains("PSSQLite"))) {
-    if ($PSVersionTable.PSVersion.Major -lt 5) {
-        $url = 'https://github.com/RamblingCookieMonster/PSSQLite.git'
-        # Invoke-Expression $(New-Object System.Net.WebClient).DownloadString($url)
-    }
-    else {
-        Install-Module PSSQLite -Scope CurrentUser
-    }
-}
 Import-Module PSSQLite
 
 # Custom function for editing records in the database
