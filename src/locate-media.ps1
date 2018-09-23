@@ -26,7 +26,7 @@ $sqliteInstalled = Get-ChildItem $progPaths `
 if(-not $sqliteInstalled) {
     # Download binaries
     # Install binaries
-    # Confirm
+    # Include it in environment variable 'PATH'
 } 
 
 # Installation of PSSQLite Module
