@@ -1,37 +1,64 @@
-﻿<# 
-      locate-media.ps1
-
-  Copyright (c) 2018 DevSolutions Ltd. All rights reserved.
-  See LICENSE for details.
-
-  --------------------------------------------
-   Locate media files on a specific computer,  
-   obtain the metadata and store in a database
-  --------------------------------------------
-
-  - Install PSSQLite if not already present, run 
-       'Install-Module PSSQLite -Scope CurrentUser'
-
-  - More info: 
-  https://github.com/RamblingCookieMonster/PSSQLite/blob/master/README.md 
+﻿<#
+.SYNOPSIS   
+Locate media files on a specific computer, 
+obtain the metadata and store in a database
+.DESCRIPTION
+Will search a given directory tree for media files - both audio
+and video. The file formats that are searched for include 
+wav, mp3, mp4, wma, wmv, midi and m4a. When found, the list of
+files, as well as file attributes are stored in an SQLite 
+database (user will be prompted for the path of the database). 
+If the database is not pre-existing, then it will be created.
+Again, the user is prompted to provide the name of the database
+table where the data are stored.
+.NOTES
+Copyright (c) 2018 DevSolutions Ltd. All rights reserved.
+See LICENSE for details.
+.LINK
+https://github.com/RamblingCookieMonster/PSSQLite/blob/master/README.md 
 #>
 
-# Installation of PSSQLite Module (when necessary)
-$modLoc = "$env:USERPROFILE\Documents\WindowsPowerShell\Modules"
-if (-not ($(Get-Childitem $modLoc).Name.Contains("PSSQLite"))) {
-    $psVer = $PSVersionTable.PSVersion.Major
-    if ($psVer -lt 5) {
-        # $url = 'https://github.com/RamblingCookieMonster/PSSQLite.git'
-        # Invoke-Expression $(New-Object System.Net.WebClient).DownloadString($url)
-        Write-Host "Download of PSSQLite not yet implemented for $psVer `n"
+# TODO: Installation of SQLite
+# Check if installed
+$progPaths = $env:ProgramData, $env:ProgramFiles, ${env:ProgramFiles(x86), $env:SystemDrive }
+$sqliteInstalled = Get-ChildItem $progPaths `
+| Where-Object { $_.Name.Contains("sqlite") }
+if(-not $sqliteInstalled) {
+    # Download binaries
+    # Install binaries
+    # Confirm
+} 
+
+# Installation of PSSQLite Module
+# TODO: Review module checking
+if (-not (Get-Module -ListAvailable | Where-Object { $_.Name -eq "PSSQLite" } )) {
+    $ver = $PSVersionTable.PSVersion.Major
+    if (($ver -lt 5) -and ($ver -ge 3)) {
+        $url = 'https://github.com/RamblingCookieMonster/PSSQLite/zipball/master'
+        $sqlZip = Join-Path -Path $HOME -ChildPath "Downloads/PSSQLite.zip"
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $url -OutFile $sqlZip -Verbose
+        # TODO: Optionally use .NET:
+        # (New-Object System.Net.WebClient).DownloadFile($url, $sqlZip)
+        
+        # Unzip to Module directory
+        $userModPath = $env:PSModulePath.split(';') `
+        | Where-Object { $_.Contains("Documents") }
+        $shell = New-Object -com shell.application
+		$zipped = $shell.NameSpace($sqlZip)
+		foreach($item in $zipped.items())
+		{
+			$shell.NameSpace($userModPath).copyhere($item)
+		}
+    }
+    elseif ($ver -ge 5) {
+        Install-Module PSSQLite -Scope CurrentUser -Verbose
     }
     else {
-        Write-Host "Installing PSSQLite Module... "
-        Install-Module PSSQLite -Scope CurrentUser
-        Write-Host "Done`n"
+        Write-Output "Automated installation of PSSQLite Module not implemented for PS version lower than 3.0"
     }
 }
-Import-Module PSSQLite
+Import-Module PSSQLite -Verbose
 
 # Collect a list of media files
 [string]$srchRoot = Read-Host -Prompt "Enter search path of root directory"
@@ -40,14 +67,12 @@ if (-not $(Test-Path $srchRoot)) {
 }
 
 $fileList = Get-ChildItem $srchRoot -Recurse -File
-$fileList = $fileList -match "\.(wav|mp3|mp4|wma|wmv|midi|m4a)$"
-$numFiles = $fileList.Count
-
-if ($fileList -eq $null) {
+$fileList = $fileList -match "\.(wav|mp3|mp4|wma|wmv|midi|m4a)$" 
+if ($null -eq $fileList) {
     Write-Error "No media files were discovered"
 }
 else {
-    Write-Output "Search completed. $numFiles files were found."
+    Write-Output "Search completed.`n$fileList.Count files were found."
 }
 
 # Connect to database
@@ -90,11 +115,13 @@ if (Get-Opt -eq 'Y') {
 
 foreach ($file in $fileList.FullName) 
 {
+    # Remove apostrophe's from any of the paths
     if ($file.Contains("'")) {
         $newName = $file.Replace("'", "")
         Rename-Item -Path $file -NewName $newName -Force 
         $file = $newName
     }
+
     $props = Get-ItemProperty $file
     $SQLQuery = "INSERT INTO $table (
                      created,
