@@ -25,7 +25,7 @@ We can collect several Excel files and easily merge their data. For this to work
 **Inside R**
 
 ``` r
-source('src/harmonise.R')
+source('scripts/harmonise.R')
 ```
 
 When the operation is completed, all the data from the various spreadsheets will be saved to an *SQLite* located in the **data** directory.
@@ -36,7 +36,7 @@ Consolidating the data
 There are many unwanted repetitions in the database. To fix this, we have written an R script **consolidate.R**, which is also found in the **src** directory. Data consolidation is carried out interactively within an R session like this
 
 ``` r
-source('src/consolidate.R')
+source('scripts/consolidate.R')
 ```
 
 The user will should study the output carefully and follow the prompts to rectify duplicated/erroneous entries.
@@ -47,7 +47,7 @@ Data entry
 In the interim, a data entry facility has been included with a view to markedly proper entries. To launch the electronic form, type
 
 ``` r
-source('src/DataEntry.R')
+source('scripts/DataEntry.R')
 ```
 
 For more information on how to use this feature
