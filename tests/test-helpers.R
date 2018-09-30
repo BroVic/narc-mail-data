@@ -5,7 +5,7 @@ suppressPackageStartupMessages(library(dplyr))
 library(readxl)
 library(stringr)
 
-source(file.path(getwd(), "src/helpers.R"))
+source(file.path(getwd(), "scripts/helpers.R"))
 
 ############################################
 context("Importation of Excel files into R")
