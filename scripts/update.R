@@ -13,31 +13,49 @@ cat("Done.\n")
 arg <- commandArgs(trailingOnly = TRUE)
 
 if (interactive()) {
-  deProjFile <- file.choose()
+  dataEntryFile <- file.choose()
 } else {
   if (length(arg) == 1L)
-    deProjFile <- arg
+    dataEntryFile <- arg
   else
     stop("Usage: Rscript <scriptname> <DataEntry project>")
 }
 
-if (!file.exists(deProjFile)) {
-  stop(sQuote(deProjFile), "does not exist")
-}
 
 # Create self-contained space for the incoming data
 databox <- new.env()
-load(deProjFile, databox, verbose = TRUE)
+load(dataEntryFile, databox, verbose = TRUE)
+
 
 # ------------------------------------------------------------------------
 # Database operations
-con <- dbConnect(SQLite(), "data/NARC-mailing-list.db")
 
-try({
+
+newData <- databox$Data %>% 
+  select(-id)             # remove DataEntry::DataEntry()'s auto-numbering
+
+cat("Select the database to be updated\n")
+databaseFile <- file.choose()
+
+con <- dbConnect(SQLite(), databaseFile)
+
+
+try ({
   
-  oldData <- dbReadTable(con, name = "mail_consolid")
-  newData <- databox$Data %>% 
-    select(-id)             # remove DataEntry::DataEntry()'s auto-numbering
+  tableName <- "NARC_consolidated"
+  
+  if (isDbFile <- endsWith(databaseFile, ".db")) {
+    oldData <-
+      dbReadTable(con, name = ) # TODO: Fetch table name generically
+    
+  } else if (endsWith(databaseFile, ".rds")) {
+    oldData <- readRDS(databaseFile)
+    
+  }
+  
+  # TODO: Undo this hard-coding later
+  oldData <- oldData %>% 
+    select(-serialno)
   
   if (!identical(colnames(oldData), colnames(newData))) {
     stop("Column mismatch between incoming and existing datasets")
@@ -48,7 +66,6 @@ try({
   
   numNewData <- nrow(newData)
   if ((nrow(oldData) + numNewData) != nrow(updatedData)) {
-    
     warning("The sum of observations from both datasets is incorrect")
     
     opt <- menu(c("Yes", "No"), title = "Continue?")
@@ -57,18 +74,25 @@ try({
       stop("Operation was stopped")
   }
   
-  cat("Writing new records to local database...")
-  dbWriteTable(con,
-               name = "mail_consolid",
-               value = updatedData,
-               overwrite = TRUE)
-  cat(sprintf("%d new records added to the database\n", numNewData))
+  if (isDbFile) {
+    cat("Writing new records to local database...")
+    dbWriteTable(con,
+                 name = tableName,
+                 value = updatedData,
+                 overwrite = TRUE)
+    cat(sprintf("%d new records added to the database\n", numNewData))
+  } 
+  else {
+    saveRDS(updatedData, file = databaseFile)
+  }
   
+  # Reset the data entry project file
   databox$Data <- newData[FALSE, ]
   databox$Data <- databox$Data %>% 
-    {
-      bind_cols(data.frame(id = integer()), .)  # return id column
-    }
+  {
+    bind_cols(data.frame(id = integer()), .)  # return id column
+  }
+  save(list = ls(envir = databox), file = dataEntryFile, envir = databox)
   
   # ---- Caching -----------------------------------------------------
   cache <- normalizePath("data/.cache")
@@ -78,13 +102,12 @@ try({
   
   tmp <- tempfile("cache", cache, ".rds")
   saveRDS(newData, tmp)
-  save(list = ls(envir = databox), file = deProjFile, envir = databox)
   
   cat("Data entry file has been reset and backup cached at",
       dirname(tmp),
       fill = TRUE)
-  
 })
 
 dbDisconnect(conn = con)
+
 #END
