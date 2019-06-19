@@ -1,6 +1,6 @@
 # harmonise.ps1
 
-## Script to launch harmonisation of spreadsheets
+## PowerShell script to launch harmonisation of spreadsheets
 
 $numArgs = $args.Length
 if ($($numArgs -gt 1))
@@ -16,7 +16,7 @@ if ($directory -ne $null) {
   exit
 }
 
-$srcfile = ".\src\harmonise.R"
+$srcfile = ".\scripts\harmonise.R"
 $Rflags = "--vanilla"
 $options = "--verbose"
 if ($isValidPath)
