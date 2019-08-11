@@ -1,23 +1,47 @@
-# Send an email from within Powershell using data stored in CSV and SQLite data tables
+<#
+.SYNOPSIS
+Send an email from within Powershell using data stored in CSV and SQLite data tables.
+.DESCRIPTION
+A dataset containing individuals' names and email addresses is accessed, providing
+options for selecting appropriate tables (for SQLite databases) and then columns.
+General email inputs are requested, including authentication credentials - Gmail is 
+the supported service.
+.NOTES
+09 Aug 2019: To use this script with Gmail, go to Google Account settings at
+https://myaccount.google.com/u/1/security and enable "Less Secure Apps". 
+.INPUTS
+None
+.OUTPUTS
+None
+.LINK
+https://github.com/DevSolutionsLtd/narc-mail-data/scripts/PS/email.ps1
+#>
 
-#####################        IMPORTANT NOTICE!            #######################
-##                              09 Aug 2019                                    ##
-##                                                                             ##
-##    To use this script with Gmail, go to Google Account settings at          ##
-##    https://myaccount.google.com/u/1/security and enable "Less Secure Apps". ##
-##                                                                             ##                                                                             ##
-#################################################################################
-
-# Definition of local function(s)
-function Read-ColumnNames
+###################################################
+# Definition for local function(s)
+###################################################
+function Read-SpecifiedValues
 {
-    $stub = "Name of column holding recipients' "
-    [string]$nameCol = Read-Host -Prompt ($stub + "names")
-    [string]$emailCol = Read-Host -Prompt ($stub + "email addresses")
-    @($nameCol, $emailCol)
+    param($Value)
+    $stub = "Name of column holding recipients' {0}"
+    Read-Host -Prompt ($stub -f $Value)
 }
 
-###########################
+
+function Read-ColumnNames
+{
+    [string[]]$columnNames = @()
+    $values = "names", "email addresses"
+    foreach ($value in $values) {
+        $columnNames += Read-SpecifiedValues $value
+    }
+    
+    @{columnName=$columnNames}
+}
+
+#######################################################
+# Dependencies
+#######################################################
 
 # Install PSSQLite Module, if necessary
 $module = "PSSQLite"
@@ -57,19 +81,21 @@ if (-not (Get-InstalledModule).Name.Contains($module)) {
     }
 }
 
-# Retrieve data from the datafile
 Import-Module $module
 
+###############################################
+# Data retrieval
+###############################################
 [string]$datafile = Read-Host -Prompt "Enter path to the datafile"
 
 [bool]$isCsv = $datafile.EndsWith(".csv")
 [bool]$isSqliteDb = $datafile.EndsWith(".db") -or $datafile.EndsWith(".sqlite")  # TODO: Go binary.
 
-$names = $emails = $result = @()
+$names = $emails = @()
 
 if ($isCsv) {
-    $cvsDdata = Import-Csv $datafile
-    $cvsDdata | Format-Table
+    $csvData = Import-Csv $datafile
+    $dataPreview = $csvData[1..3]
 } 
 elseif ($isSqliteDb) {
     $conn = New-SQLiteConnection -DataSource $datafile
@@ -79,7 +105,7 @@ elseif ($isSqliteDb) {
         Invoke-SqliteQuery -SQLiteConnection $conn -Query $Query
     }
 
-    Write-Host "Tables available in this datafile:"
+    Write-Host "Tables in this database:"
     $availTbls = Use-Query "PRAGMA STATS"
     $availTbls | Format-Table
 
@@ -87,59 +113,69 @@ elseif ($isSqliteDb) {
         [string]$table = Read-Host -Prompt "Pick one (Enter name of the table)"
         $tableExists = $availTbls.table.Contains($table)
     } while (-not $tableExists)
-    
-
+    $dataPreview = Use-Query "SELECT * FROM $table LIMIT 3;"
 }
 
 $opt = Read-Host -Prompt "Preview the data table? (Y/N)"
 if ($opt -eq 'Y') {
-    $dataPreview = @()
-    if ($isSqliteDb) {
-        $dataPreview = Use-Query "SELECT * FROM $table LIMIT 3;"
-    }
-    elseif ($isCsv) {
-        $dataPreview = $cvsDdata[1..3]
-    }
-
     $dataPreview | Format-Table
 }
 
 $result = Read-ColumnNames
-$col_name = $result[0]
-$col_email = $result[1]
+$col_name = $result.columnName[0]
+$col_email = $result.columnName[1]
 
 if ($isSqliteDb) {
     $names = Use-Query "SELECT $col_name FROM $table;"
     $emails = Use-Query "SELECT $col_email FROM $table;"
+    $conn.Shutdown()   # We're done with DB
 }
 elseif ($isCsv) {
-    $names = $cvsDdata.$col_name
-    $emails = $cvsDdata.$col_email
+    $names = $csvData.$col_name
+    $emails = $csvData.$col_email
 }
-# $conn.Shutdown()
 
+########################################################
 # Prepare and send email message
+########################################################
 [string]$Sender = Read-Host "Sender's email address"
 [string]$Subject = Read-Host "Subject"
 
 ## Body (optional)
 [string]$Body = Read-Host "Message (optional - write here or provide path to .TXT file)"
-if (-not (Test-Path $Body) -and (-not ($Body.EndsWith(".txt")))) {
+$Body = $Body.Trim()
+if ($Body.Length -eq 0) {
+    $Body = " "
     Write-Warning "No message provided"
 }
-else {
-    $Body = Get-Content $Body
+
+if ((Test-Path $Body) -and ($Body.CompareTo(" ") -ne 0)) {
+    if ($Body.EndsWith(".txt")) {
+        $Body = Get-Content $Body
+    }
+    else {
+        Write-Error "Reading of this type of file is not supported."
+    }
 }
 
 $SMTPServer = "smtp.gmail.com"
 [int]$SMTPPort = 587
 $storedCredentials = Get-Credential
 
-for ($i = 0; $i -lt $names.Length; $i++) {
-    $nameString = $names[$i].name
-    $emailAddress = $emails[$i].email
-    $Receiver = "$nameString <$emailAddress>"
-    $Body = $Body.Replace("<<Name>>", $nameString)   #TODO: Bug!
+if ((Read-Host "Sending message(s). Continue? (Y/N)") -eq 'Y') {
+    for ($i = 0; $i -lt $names.Length; $i++) {
+        $nameString = $names[$i].name
+        $emailAddress = $emails[$i].email
+        $Receiver = "$nameString <$emailAddress>"
 
-    Send-MailMessage -from $Sender -to $Receiver -Subject $Subject -Body $Body -SmtpServer $SMTPServer -port $SMTPPort -UseSsl -Credential $storedCredentials
+        $placeholder = "<<Name>>"
+        $sentBody = $Body
+        if ($sentBody.Contains($placeholder)) {
+            $sentBody = $sentBody.Replace($placeholder, $nameString)
+        }
+        Send-MailMessage -from $Sender -to $Receiver -Subject $Subject -Body $sentBody -SmtpServer $SMTPServer -port $SMTPPort -UseSsl -Credential $storedCredentials
+    }
+}
+else {
+    Write-Output "Nothing to be done"
 }
