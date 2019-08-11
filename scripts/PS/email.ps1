@@ -17,6 +17,10 @@ None
 https://github.com/DevSolutionsLtd/narc-mail-data/scripts/PS/email.ps1
 #>
 
+param(
+    [string[]]$Attachments = ""
+)
+
 ###################################################
 # Definition for local function(s)
 ###################################################
@@ -86,7 +90,9 @@ Import-Module $module
 ###############################################
 # Data retrieval
 ###############################################
-[string]$datafile = Read-Host -Prompt "Enter path to the datafile"
+do {
+    [string]$datafile = Read-Host -Prompt "Enter path to the datafile"
+} while (-not (Test-Path $datafile))
 
 [bool]$isCsv = $datafile.EndsWith(".csv")
 [bool]$isSqliteDb = $datafile.EndsWith(".db") -or $datafile.EndsWith(".sqlite")  # TODO: Go binary.
@@ -138,11 +144,9 @@ elseif ($isCsv) {
 ########################################################
 # Prepare and send email message
 ########################################################
-[string]$Sender = Read-Host "Sender's email address"
-[string]$Subject = Read-Host "Subject"
+[string]$Subject = Read-Host "Subject (required)"
 
-## Body (optional)
-[string]$Body = Read-Host "Message (optional - write here or provide path to .TXT file)"
+[string]$Body = Read-Host "Message (optional or path to .TXT file)"
 $Body = $Body.Trim()
 if ($Body.Length -eq 0) {
     $Body = " "
@@ -158,14 +162,23 @@ if ((Test-Path $Body) -and ($Body.CompareTo(" ") -ne 0)) {
     }
 }
 
+$storedCredentials = Get-Credential
+[string]$Sender = $storedCredentials.UserName
+
 $SMTPServer = "smtp.gmail.com"
 [int]$SMTPPort = 587
-$storedCredentials = Get-Credential
 
 if ((Read-Host "Sending message(s). Continue? (Y/N)") -eq 'Y') {
     for ($i = 0; $i -lt $names.Length; $i++) {
-        $nameString = $names[$i].name
-        $emailAddress = $emails[$i].email
+        if ($isSqliteDb) {
+            $nameString = $names[$i].name
+            $emailAddress = $emails[$i].email
+        }
+        elseif ($isCsv) {
+            $nameString = $names[$i]
+            $emailAddress = $emails[$i]
+        }
+
         $Receiver = "$nameString <$emailAddress>"
 
         $placeholder = "<<Name>>"
@@ -173,7 +186,7 @@ if ((Read-Host "Sending message(s). Continue? (Y/N)") -eq 'Y') {
         if ($sentBody.Contains($placeholder)) {
             $sentBody = $sentBody.Replace($placeholder, $nameString)
         }
-        Send-MailMessage -from $Sender -to $Receiver -Subject $Subject -Body $sentBody -SmtpServer $SMTPServer -port $SMTPPort -UseSsl -Credential $storedCredentials
+        Send-MailMessage -from $Sender -to $Receiver -Subject $Subject -Body $sentBody -Attachments $Attachments -SmtpServer $SMTPServer -port $SMTPPort -UseSsl -Credential $storedCredentials
     }
 }
 else {
