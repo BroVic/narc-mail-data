@@ -6,9 +6,17 @@ A dataset containing individuals' names and email addresses is accessed, providi
 options for selecting appropriate tables (for SQLite databases) and then columns.
 General email inputs are requested, including authentication credentials - Gmail is 
 the supported service.
-.NOTES
-09 Aug 2019: To use this script with Gmail, go to Google Account settings at
+
+NB: To use this script with Gmail, go to Google Account settings at
 https://myaccount.google.com/u/1/security and enable "Less Secure Apps". 
+(09 Aug 2019)
+.PARAMETER Attachments
+An array of paths and filename for files to be attached to the email.
+.NOTES
+Author: Victor A. Ordu
+Copyright: DevSolutions Ltd.
+Version: 0.0.0.9003
+Last Edit: 2019-08-11
 .INPUTS
 None
 .OUTPUTS
@@ -18,7 +26,8 @@ https://github.com/DevSolutionsLtd/narc-mail-data/scripts/PS/email.ps1
 #>
 
 param(
-    [string[]]$Attachments = ""
+    [Parameter(Mandatory = $false)]
+    [string[]]$Attachments
 )
 
 ###################################################
@@ -26,12 +35,12 @@ param(
 ###################################################
 function Read-SpecifiedValues
 {
-    param($Value)
+    param(
+        [string]$Value
+    )
     $stub = "Name of column holding recipients' {0}"
     Read-Host -Prompt ($stub -f $Value)
 }
-
-
 function Read-ColumnNames
 {
     [string[]]$columnNames = @()
@@ -146,16 +155,16 @@ elseif ($isCsv) {
 ########################################################
 [string]$Subject = Read-Host "Subject (required)"
 
-[string]$Body = Read-Host "Message (optional or path to .TXT file)"
-$Body = $Body.Trim()
-if ($Body.Length -eq 0) {
-    $Body = " "
+[string]$msg = Read-Host "Message (optional or path to .TXT file)"
+$msg = $msg.Trim()
+if ($msg.Length -eq 0) {
+    $msg = " "
     Write-Warning "No message provided"
 }
 
-if ((Test-Path $Body) -and ($Body.CompareTo(" ") -ne 0)) {
-    if ($Body.EndsWith(".txt")) {
-        $Body = Get-Content $Body
+if ((Test-Path $msg) -and ($msg.CompareTo(" ") -ne 0)) {
+    if ($msg.EndsWith(".txt")) {
+        $msg = Get-Content $msg
     }
     else {
         Write-Error "Reading of this type of file is not supported."
@@ -182,11 +191,19 @@ if ((Read-Host "Sending message(s). Continue? (Y/N)") -eq 'Y') {
         $Receiver = "$nameString <$emailAddress>"
 
         $placeholder = "<<Name>>"
-        $sentBody = $Body
-        if ($sentBody.Contains($placeholder)) {
-            $sentBody = $sentBody.Replace($placeholder, $nameString)
+        $body = $msg
+        if ($msg.Contains($placeholder)) {
+            $body = $msg.Replace($placeholder, $nameString)
         }
-        Send-MailMessage -from $Sender -to $Receiver -Subject $Subject -Body $sentBody -Attachments $Attachments -SmtpServer $SMTPServer -port $SMTPPort -UseSsl -Credential $storedCredentials
+
+        if ($Attachments.Length -ne 0 -and (Test-Path $Attachments)) {
+            Send-MailMessage -from $Sender -to $Receiver -Subject $Subject -Body $body -Attachments $Attachments -SmtpServer $SMTPServer -port $SMTPPort -UseSsl -Credential $storedCredentials
+        }
+        else {
+            Send-MailMessage -from $Sender -to $Receiver -Subject $Subject -Body $body -SmtpServer $SMTPServer -port $SMTPPort -UseSsl -Credential $storedCredentials
+        }
+        
+        Write-Progress "Sending email" -PercentComplete ($i/$names.Length*100)
     }
 }
 else {
