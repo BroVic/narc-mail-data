@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8">
+    <title>Nehemiah Apostolic Centre Data Entry Interface</title>
+    <style>
+        body {
+            background-color:grey;
+        }
+        
+        form {
+            border:1px;
+            border-color:black;
+        }
+    </style>
+    <script src="js/sql.js"></script>
+    <script>
+        // Create database connection
+        var db = new SQL.Database();
+        
+        db.run("CREATE TABLE test (col1, col2);");
+        db.run("INSERT INTO test VALUES (?,?), (?,?);", [1,111,2,222]);
+        var stmnt  = db.prepare('SELECT * FROM test WHERE col1 BETWEEN $start AND $end;');
+        stmnt.getAsObject({$start:1, $end:1});
+        stmnt.bind({$start:1, $end:2});
+        while(stmnt.step()) {
+            var row = stmnt.getAsObject();
+        }
+    </script>
+  </head>
+  
+
+  <body>
+    <center>
+      <header>
+	<h1>Nehemiah Apostolic Centre Data Entry Interface</h1>	
+      </header>
+      <form id="entries">	
+	Name:<br>
+	<input type="text" id="name" title="Enter the full name."><br>
+	Address:<br>
+	<input type="text" id="address"><br>
+	Mobile:<br>
+	<input type="tel" id="phone"><br>
+	Email:<br>
+	<input type="email" id="email"><br>
+	Birthday:<br> Day          Month<br>
+	<input type="number" id="bday.day" min="1" max="31"> <input type="Month" id="bday.mth"><br>
+	Wedding Anniversary:<br> Day       Month<br>
+	<input type="number" id="wedann.day" min="1" max="31"> <input type="Month" id="wedann.mth"><br>
+	<!-- Consider having other fields on biodata e.g. sex, age,
+	     etc.-->
+	Occupation:<br>
+	<input type="text" id="occupation"><br>
+	Church:<br>
+	<input type="text" id="church"><br>
+	Pastor's Name:<br>
+	<input type="text" id="pastor"><br>
+	How you got to know about us:<br>
+	<input type="text" id="info.source"><br>
+	<input type="submit" id="submitButton">
+	<input type="reset" id="resetButton">	
+      </form>
+      <footer>
+	Copyright &copy; DevSolutions Ltd 2018-2019.
+      </footer>  
+    </center>
+  </body>
+</html>
