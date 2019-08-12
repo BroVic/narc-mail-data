@@ -14,9 +14,9 @@ https://myaccount.google.com/u/1/security and enable "Less Secure Apps".
 An array of paths and filename for files to be attached to the email.
 .NOTES
 Author: Victor A. Ordu
-Copyright: DevSolutions Ltd.
+Copyright: DevSolutions Ltd. 2019
 Version: 0.0.0.9003
-Last Edit: 2019-08-11
+Last Edit: 2019-08-12
 .INPUTS
 None
 .OUTPUTS
@@ -85,11 +85,9 @@ if (-not (Get-InstalledModule).Name.Contains($module)) {
                 $filepath = Join-Path -Path $userModPath -ChildPath $_
                 [IO.Compression.ZipFileExtensions]::ExtractToFile($_, $filepath, $Overwrite)
             }
-    }
-    elseif ($PowerShellVersion -ge 5) {
+    } elseif ($PowerShellVersion -ge 5) {
         Install-Module $module -Scope CurrentUser
-    }
-    else {
+    } else {
         Write-Error "Automated installation not enabled for versions lower than 3.0"
     }
 }
@@ -111,8 +109,7 @@ $names = $emails = @()
 if ($isCsv) {
     $csvData = Import-Csv $datafile
     $dataPreview = $csvData[1..3]
-} 
-elseif ($isSqliteDb) {
+}  elseif ($isSqliteDb) {
     $conn = New-SQLiteConnection -DataSource $datafile
     function Use-Query
     {
@@ -144,8 +141,7 @@ if ($isSqliteDb) {
     $names = Use-Query "SELECT $col_name FROM $table;"
     $emails = Use-Query "SELECT $col_email FROM $table;"
     $conn.Shutdown()   # We're done with DB
-}
-elseif ($isCsv) {
+} elseif ($isCsv) {
     $names = $csvData.$col_name
     $emails = $csvData.$col_email
 }
@@ -165,8 +161,7 @@ if ($msg.Length -eq 0) {
 if ((Test-Path $msg) -and ($msg.CompareTo(" ") -ne 0)) {
     if ($msg.EndsWith(".txt")) {
         $msg = Get-Content $msg
-    }
-    else {
+    } else {
         Write-Error "Reading of this type of file is not supported."
     }
 }
@@ -182,8 +177,7 @@ if ((Read-Host "Sending message(s). Continue? (Y/N)") -eq 'Y') {
         if ($isSqliteDb) {
             $nameString = $names[$i].name
             $emailAddress = $emails[$i].email
-        }
-        elseif ($isCsv) {
+        } elseif ($isCsv) {
             $nameString = $names[$i]
             $emailAddress = $emails[$i]
         }
@@ -198,14 +192,12 @@ if ((Read-Host "Sending message(s). Continue? (Y/N)") -eq 'Y') {
 
         if ($Attachments.Length -ne 0 -and (Test-Path $Attachments)) {
             Send-MailMessage -from $Sender -to $Receiver -Subject $Subject -Body $body -Attachments $Attachments -SmtpServer $SMTPServer -port $SMTPPort -UseSsl -Credential $storedCredentials
-        }
-        else {
+        } else {
             Send-MailMessage -from $Sender -to $Receiver -Subject $Subject -Body $body -SmtpServer $SMTPServer -port $SMTPPort -UseSsl -Credential $storedCredentials
         }
         
         Write-Progress "Sending email" -PercentComplete ($i/$names.Length*100)
     }
-}
-else {
+} else {
     Write-Output "Nothing to be done"
 }
